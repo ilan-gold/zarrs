@@ -2,11 +2,11 @@
 
 use itertools::Itertools;
 use ndarray::{array, Array2, ArrayD};
+use zarrs::indexer::Indexer;
 use zarrs::{
     storage::storage_adapter::usage_log::UsageLogStorageAdapter,
     storage::ReadableWritableListableStorage,
 };
-
 fn array_write_read() -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::Arc;
     use zarrs::{

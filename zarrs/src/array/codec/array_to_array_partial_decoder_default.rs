@@ -5,6 +5,7 @@ use zarrs_metadata::DataTypeSize;
 use crate::{
     array::{ArrayBytes, ChunkRepresentation, RawBytesOffsets},
     array_subset::ArraySubset,
+    indexer::Indexer,
 };
 
 use super::{ArrayPartialDecoderTraits, ArrayToArrayCodecTraits, CodecError, CodecOptions};

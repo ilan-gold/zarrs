@@ -3,11 +3,12 @@ use std::iter::FusedIterator;
 use crate::{
     array::{ravel_indices, ArrayShape},
     array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    indexer::Indexer,
 };
 
 use super::IndicesIterator;
 
-/// An iterator over the linearised indices in an array subset.
+/// An iterator over the linearised indices in an array indexer.
 ///
 /// Iterates over the last dimension fastest (i.e. C-contiguous order).
 /// For example, consider a 4x3 array with linearised element indices
@@ -32,16 +33,13 @@ impl LinearisedIndices {
         subset: ArraySubset,
         array_shape: ArrayShape,
     ) -> Result<Self, IncompatibleArraySubsetAndShapeError> {
-        if subset.dimensionality() == array_shape.len()
-            && std::iter::zip(subset.end_exc(), &array_shape).all(|(end, shape)| end <= *shape)
-        {
-            Ok(Self {
-                subset,
-                array_shape,
-            })
-        } else {
-            Err(IncompatibleArraySubsetAndShapeError(subset, array_shape))
-        }
+        if !subset.is_compatible_shape(&array_shape) {
+            return Err(IncompatibleArraySubsetAndShapeError(subset, array_shape));
+        };
+        return Ok(Self {
+            subset,
+            array_shape,
+        });
     }
 
     /// Create a new linearised indices iterator.

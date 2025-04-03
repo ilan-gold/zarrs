@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use zarrs::indexer::Indexer;
 use zarrs::storage::{
     storage_adapter::usage_log::UsageLogStorageAdapter, ReadableWritableListableStorage,
 };
-
 fn array_write_read() -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::Arc;
     use zarrs::{

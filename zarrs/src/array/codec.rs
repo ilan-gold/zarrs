@@ -90,6 +90,7 @@ pub use array_to_bytes_partial_encoder_default::ArrayToBytesPartialEncoderDefaul
 pub use array_to_bytes_partial_encoder_default::AsyncArrayToBytesPartialEncoderDefault;
 
 use crate::array_subset::IncompatibleDimensionalityError;
+use crate::indexer::Indexer;
 mod array_to_array_partial_decoder_default;
 pub use array_to_array_partial_decoder_default::ArrayToArrayPartialDecoderDefault;
 #[cfg(feature = "async")]

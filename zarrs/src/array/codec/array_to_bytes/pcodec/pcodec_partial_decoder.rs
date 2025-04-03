@@ -9,6 +9,7 @@ use crate::array::{
     },
     ArraySize, ChunkRepresentation, DataType,
 };
+use crate::indexer::Indexer;
 
 #[cfg(feature = "async")]
 use crate::array::codec::{AsyncArrayPartialDecoderTraits, AsyncBytesPartialDecoderTraits};

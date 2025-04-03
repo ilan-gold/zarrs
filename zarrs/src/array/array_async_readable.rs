@@ -6,6 +6,7 @@ use unsafe_cell_slice::UnsafeCellSlice;
 use crate::{
     array_subset::ArraySubset,
     config::MetadataRetrieveVersion,
+    indexer::Indexer,
     node::{meta_key_v2_array, meta_key_v2_attributes, meta_key_v3, NodePath},
     storage::{AsyncBytes, AsyncReadableStorageTraits, StorageError, StorageHandle},
 };
@@ -840,6 +841,8 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
         chunk_subset: &ArraySubset,
         options: &CodecOptions,
     ) -> Result<ndarray::ArrayD<T>, ArrayError> {
+        use crate::indexer::Indexer;
+
         let elements = self
             .async_retrieve_chunk_subset_elements_opt(chunk_indices, chunk_subset, options)
             .await?;

@@ -7,6 +7,7 @@ use crate::array::{codec::CodecOptions, Array, ArrayError, ChunkRepresentation};
 use crate::array_subset::ArraySubset;
 
 use super::RawBytesDlPack;
+use crate::indexer::Indexer;
 
 #[cfg(doc)]
 use super::ArrayDlPackExtError;

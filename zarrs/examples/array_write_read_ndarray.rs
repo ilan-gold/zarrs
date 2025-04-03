@@ -2,6 +2,7 @@
 
 use ndarray::{array, Array2, ArrayD};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use zarrs::indexer::Indexer;
 use zarrs::storage::{
     storage_adapter::usage_log::UsageLogStorageAdapter, ReadableWritableListableStorage,
 };

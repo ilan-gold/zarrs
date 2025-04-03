@@ -9,6 +9,7 @@ use rayon::iter::{
 use crate::{
     array::{chunk_shape_to_array_shape, ArrayIndices},
     array_subset::{ArraySubset, IncompatibleDimensionalityError},
+    indexer::Indexer,
 };
 
 use super::{

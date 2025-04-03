@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use zarrs_metadata::codec::ZFP;
 
+#[cfg(feature = "async")]
+use crate::array::codec::{AsyncArrayPartialDecoderTraits, AsyncBytesPartialDecoderTraits};
 use crate::{
     array::{
         codec::{
@@ -12,10 +14,8 @@ use crate::{
     },
     array_subset::ArraySubset,
     byte_range::extract_byte_ranges_concat,
+    indexer::Indexer,
 };
-
-#[cfg(feature = "async")]
-use crate::array::codec::{AsyncArrayPartialDecoderTraits, AsyncBytesPartialDecoderTraits};
 
 use super::{zarr_to_zfp_data_type, zfp_decode, ZfpMode};
 

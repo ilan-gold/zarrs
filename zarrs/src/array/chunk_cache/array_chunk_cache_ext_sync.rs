@@ -4,6 +4,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon_iter_concurrent_limit::iter_concurrent_limit;
 use unsafe_cell_slice::UnsafeCellSlice;
 
+use crate::indexer::Indexer;
 use crate::{
     array::{
         array_bytes::merge_chunks_vlen,

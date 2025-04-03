@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
 use futures::TryStreamExt;
+use zarrs::indexer::Indexer;
 use zarrs::storage::{
     storage_adapter::usage_log::UsageLogStorageAdapter, AsyncReadableWritableListableStorage,
 };
-
 async fn async_array_write_read() -> Result<(), Box<dyn std::error::Error>> {
     use futures::StreamExt;
     use std::sync::Arc;

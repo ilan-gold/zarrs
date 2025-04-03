@@ -3,6 +3,7 @@ use std::iter::FusedIterator;
 use crate::{
     array::{unravel_index, ArrayIndices},
     array_subset::ArraySubset,
+    indexer::Indexer,
 };
 
 use rayon::iter::{

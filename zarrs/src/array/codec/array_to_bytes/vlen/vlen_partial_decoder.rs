@@ -2,6 +2,7 @@
 
 use std::{num::NonZeroU64, sync::Arc};
 
+use crate::indexer::Indexer;
 use crate::{
     array::{
         array_bytes::extract_decoded_regions_vlen,

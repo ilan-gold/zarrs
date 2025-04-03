@@ -3,6 +3,7 @@ use criterion::{
     PlotConfiguration, Throughput,
 };
 use zarrs::array_subset::ArraySubset;
+use zarrs::indexer::Indexer;
 
 fn array_subset_indices_iterator(c: &mut Criterion) {
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);

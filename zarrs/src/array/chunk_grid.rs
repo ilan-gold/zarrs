@@ -15,6 +15,7 @@ pub mod regular;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
+use crate::indexer::Indexer;
 pub use crate::metadata::chunk_grid::rectangular::{
     RectangularChunkGridConfiguration, RectangularChunkGridDimensionConfiguration,
 };

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::{
     array::{array_bytes::update_array_bytes, ArrayBytes, ChunkRepresentation},
     array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    indexer::Indexer,
 };
 
 use super::{

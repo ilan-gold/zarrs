@@ -8,6 +8,7 @@ use crate::array::{
 
 #[cfg(feature = "async")]
 use crate::array::codec::AsyncArrayPartialDecoderTraits;
+use crate::indexer::Indexer;
 
 /// Partial decoder for the Transpose codec.
 pub(crate) struct TransposePartialDecoder {

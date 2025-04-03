@@ -8,6 +8,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
+use zarrs::indexer::Indexer;
 use zarrs::{
     array::{codec, Array, DataType, FillValue, ZARR_NAN_F32},
     array_subset::ArraySubset,

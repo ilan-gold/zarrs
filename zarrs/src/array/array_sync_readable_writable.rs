@@ -5,6 +5,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::{
     array::ArrayBytes,
     array_subset::ArraySubset,
+    indexer::Indexer,
     storage::{ReadableWritableStorageTraits, StorageHandle},
 };
 

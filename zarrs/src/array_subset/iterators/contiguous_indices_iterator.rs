@@ -5,6 +5,7 @@ use itertools::izip;
 use crate::{
     array::ArrayIndices,
     array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    indexer::Indexer,
 };
 
 use super::IndicesIterator;

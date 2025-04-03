@@ -19,6 +19,7 @@ use crate::{
         BytesRepresentation, ChunkRepresentation, ChunkShape, DataTypeSize, RawBytes,
     },
     array_subset::ArraySubset,
+    indexer::Indexer,
     plugin::PluginCreateError,
 };
 

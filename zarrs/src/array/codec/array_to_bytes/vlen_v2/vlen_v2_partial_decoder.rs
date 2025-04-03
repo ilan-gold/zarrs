@@ -2,12 +2,16 @@
 
 use std::sync::Arc;
 
-use crate::array::{
-    array_bytes::extract_decoded_regions_vlen,
-    codec::{
-        ArrayPartialDecoderTraits, ArraySubset, BytesPartialDecoderTraits, CodecError, CodecOptions,
+use crate::{
+    array::{
+        array_bytes::extract_decoded_regions_vlen,
+        codec::{
+            ArrayPartialDecoderTraits, ArraySubset, BytesPartialDecoderTraits, CodecError,
+            CodecOptions,
+        },
+        ArrayBytes, ArraySize, ChunkRepresentation, DataType, DataTypeSize, FillValue, RawBytes,
     },
-    ArrayBytes, ArraySize, ChunkRepresentation, DataType, DataTypeSize, FillValue, RawBytes,
+    indexer::Indexer,
 };
 
 #[cfg(feature = "async")]

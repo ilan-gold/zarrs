@@ -1,7 +1,8 @@
 use futures::{StreamExt, TryStreamExt};
 
 use crate::{
-    array::ArrayBytes, array_subset::ArraySubset, storage::AsyncReadableWritableStorageTraits,
+    array::ArrayBytes, array_subset::ArraySubset, indexer::Indexer,
+    storage::AsyncReadableWritableStorageTraits,
 };
 
 use super::{

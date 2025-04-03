@@ -29,6 +29,8 @@ use crate::{
     storage::byte_range::ByteRange,
 };
 
+use crate::indexer::Indexer;
+
 /// An array subset.
 ///
 /// The unsafe `_unchecked methods` are mostly intended for internal use to avoid redundant input validation.
@@ -43,6 +45,62 @@ pub struct ArraySubset {
 impl Display for ArraySubset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.to_ranges().fmt(f)
+    }
+}
+
+impl Indexer for ArraySubset {
+    fn num_elements(&self) -> u64 {
+        self.shape.iter().product()
+    }
+
+    fn is_compatible_shape(&self, array_shape: &[u64]) -> bool {
+        self.dimensionality() == array_shape.len()
+            && std::iter::zip(self.end_exc(), array_shape).all(|(end, shape)| end <= *shape)
+    }
+
+    fn find_on_axis(&self, index: &u64, axis: usize) -> u64 {
+        let shape = self.start();
+        shape[axis] + index
+    }
+
+    fn shape(&self) -> &[u64] {
+        &self.shape
+    }
+
+    fn inbounds_shape(&self, array_shape: &[u64]) -> bool {
+        if self.dimensionality() != array_shape.len() {
+            return false;
+        }
+
+        for (subset_start, subset_shape, shape) in izip!(self.start(), self.shape(), array_shape) {
+            if subset_start + subset_shape > *shape {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn inbounds(&self, subset: &impl Indexer) -> bool {
+        if self.dimensionality() != subset.dimensionality() {
+            return false;
+        }
+
+        for (self_start, self_shape, other_start, other_shape) in
+            izip!(self.start(), self.shape(), subset.start(), subset.shape())
+        {
+            if self_start < other_start || self_start + self_shape > other_start + other_shape {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn start(&self) -> &[u64] {
+        &self.start
+    }
+
+    fn dimensionality(&self) -> usize {
+        self.start.len()
     }
 }
 
@@ -156,18 +214,6 @@ impl ArraySubset {
         }
     }
 
-    /// Return the start of the array subset.
-    #[must_use]
-    pub fn start(&self) -> &[u64] {
-        &self.start
-    }
-
-    /// Return the shape of the array subset.
-    #[must_use]
-    pub fn shape(&self) -> &[u64] {
-        &self.shape
-    }
-
     /// Return the shape of the array subset.
     ///
     /// # Panics
@@ -184,12 +230,6 @@ impl ArraySubset {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.shape.iter().any(|i| i == &0)
-    }
-
-    /// Return the dimensionality of the array subset.
-    #[must_use]
-    pub fn dimensionality(&self) -> usize {
-        self.start.len()
     }
 
     /// Return the end (inclusive) of the array subset.
@@ -214,24 +254,6 @@ impl ArraySubset {
         std::iter::zip(&self.start, &self.shape)
             .map(|(start, size)| start + size)
             .collect()
-    }
-
-    /// Return the number of elements of the array subset.
-    ///
-    /// Equal to the product of the components of its shape.
-    #[must_use]
-    pub fn num_elements(&self) -> u64 {
-        self.shape.iter().product()
-    }
-
-    /// Return the number of elements of the array subset as a `usize`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if [`num_elements()`](Self::num_elements()) is greater than [`usize::MAX`].
-    #[must_use]
-    pub fn num_elements_usize(&self) -> usize {
-        usize::try_from(self.num_elements()).unwrap()
     }
 
     /// Returns [`true`] if the array subset contains `indices`.
@@ -408,38 +430,6 @@ impl ArraySubset {
                 self.dimensionality(),
             ))
         }
-    }
-
-    /// Returns true if this array subset is within the bounds of `subset`.
-    #[must_use]
-    pub fn inbounds(&self, subset: &ArraySubset) -> bool {
-        if self.dimensionality() != subset.dimensionality() {
-            return false;
-        }
-
-        for (self_start, self_shape, other_start, other_shape) in
-            izip!(self.start(), self.shape(), subset.start(), subset.shape())
-        {
-            if self_start < other_start || self_start + self_shape > other_start + other_shape {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Returns true if the array subset is within the bounds of an `ArraySubset` with zero origin and a shape of `array_shape`.
-    #[must_use]
-    pub fn inbounds_shape(&self, array_shape: &[u64]) -> bool {
-        if self.dimensionality() != array_shape.len() {
-            return false;
-        }
-
-        for (subset_start, subset_shape, shape) in izip!(self.start(), self.shape(), array_shape) {
-            if subset_start + subset_shape > *shape {
-                return false;
-            }
-        }
-        true
     }
 }
 

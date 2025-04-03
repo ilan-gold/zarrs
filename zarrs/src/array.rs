@@ -69,7 +69,8 @@ pub use self::{
     element::{Element, ElementFixedLength, ElementOwned},
     storage_transformer::StorageTransformerChain,
 };
-pub use crate::data_type::{DataType, FillValue}; // re-export for zarrs < 0.20 compat
+pub use crate::data_type::{DataType, FillValue};
+use crate::indexer::Indexer; // re-export for zarrs < 0.20 compat
 
 pub use crate::metadata::v2::ArrayMetadataV2;
 pub use crate::metadata::v3::{

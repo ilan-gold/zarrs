@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::{
     array::{ArrayBytes, ArraySize, ChunkRepresentation},
     array_subset::ArraySubset,
+    indexer::Indexer,
 };
 
 use super::{
