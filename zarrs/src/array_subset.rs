@@ -49,6 +49,7 @@ impl Display for ArraySubset {
 }
 
 impl Indexer for ArraySubset {
+
     fn num_elements(&self) -> u64 {
         self.shape.iter().product()
     }
@@ -67,40 +68,19 @@ impl Indexer for ArraySubset {
         &self.shape
     }
 
-    fn inbounds_shape(&self, array_shape: &[u64]) -> bool {
-        if self.dimensionality() != array_shape.len() {
-            return false;
-        }
-
-        for (subset_start, subset_shape, shape) in izip!(self.start(), self.shape(), array_shape) {
-            if subset_start + subset_shape > *shape {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn inbounds(&self, subset: &impl Indexer) -> bool {
-        if self.dimensionality() != subset.dimensionality() {
-            return false;
-        }
-
-        for (self_start, self_shape, other_start, other_shape) in
-            izip!(self.start(), self.shape(), subset.start(), subset.shape())
-        {
-            if self_start < other_start || self_start + self_shape > other_start + other_shape {
-                return false;
-            }
-        }
-        true
-    }
-
     fn start(&self) -> &[u64] {
         &self.start
     }
 
     fn dimensionality(&self) -> usize {
         self.start.len()
+    }
+
+    /// Return the end (exclusive) of the array subset.
+    fn end_exc(&self) -> ArrayIndices {
+        std::iter::zip(&self.start, &self.shape)
+            .map(|(start, size)| start + size)
+            .collect()
     }
 }
 
@@ -246,14 +226,6 @@ impl ArraySubset {
                     .collect(),
             )
         }
-    }
-
-    /// Return the end (exclusive) of the array subset.
-    #[must_use]
-    pub fn end_exc(&self) -> ArrayIndices {
-        std::iter::zip(&self.start, &self.shape)
-            .map(|(start, size)| start + size)
-            .collect()
     }
 
     /// Returns [`true`] if the array subset contains `indices`.
