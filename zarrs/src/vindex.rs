@@ -1,6 +1,9 @@
 use crate::array::{ArrayIndices, ArrayShape};
+
 use crate::indexer::Indexer;
 use itertools::Itertools;
+use derive_more::From;
+use thiserror::Error;
 
 // TODO: sorted for now assumed
 
@@ -46,4 +49,53 @@ impl Indexer for VIndex {
         self.indices.len()
     }
 
+}
+
+/// An incompatible array and array shape error.
+#[derive(Clone, Debug, Error, From)]
+#[error("At least one of the indices was not equal to the others in length: {0:?}")]
+pub struct UnequalVIndexLengthsError(Vec<usize>);
+
+impl UnequalVIndexLengthsError {
+    /// Create a new incompatible array subset and shape error.
+    #[must_use]
+    pub fn new(indices_lengths: Vec<usize>) -> Self {
+        Self(indices_lengths)
+    }
+}
+
+/// An incompatible array and array shape error.
+#[derive(Clone, Debug, Error, From, Default)]
+#[error("Empty indices")]
+pub struct EmptyVIndexError;
+
+/// An incompatible VIndex argument
+#[derive(Debug, Error)]
+pub enum VIndexError{
+    /// An incompatible array and array shape error.
+    #[error("At least one of the indices was not equal to the others in length: {0}")]
+    UnequalVIndexLengths(#[from] UnequalVIndexLengthsError),
+    /// An incompatible array and array shape error.
+    #[error("Empty indices")]
+    EmptyVIndex(#[from] EmptyVIndexError),
+}
+
+impl VIndex {
+    fn new_from_indices(indices: Vec<ArrayIndices>) -> Result<Self, VIndexError> {
+        if !indices.iter().map(|x| x.len()).all_equal() {
+            return Err(UnequalVIndexLengthsError::new(indices.into_iter().map(|x| x.len()).collect()).into());
+        }
+        if indices.len() == 0 || indices[0].len() == 0 {
+            return Err(EmptyVIndexError.into());
+        }
+        let shape = vec![indices[0].len() as u64; indices.len()];
+        let start = indices.iter().map(|i| i[0]).collect::<Vec<_>>();
+        Ok(
+            Self {
+                shape,
+                start,
+                indices
+            }
+        )
+    }
 }
