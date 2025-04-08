@@ -93,7 +93,7 @@ impl<'a> IntoIterator for &'a LinearisedIndices {
 ///
 /// See [`LinearisedIndices`].
 pub struct LinearisedIndicesIterator<'a> {
-    inner: IndicesIterator<'a>,
+    inner: IndicesIterator<'a, ArraySubset>,
     array_shape: &'a [u64],
 }
 

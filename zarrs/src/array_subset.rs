@@ -25,7 +25,7 @@ use derive_more::From;
 use itertools::izip;
 
 use crate::{
-    array::{ArrayError, ArrayIndices, ArrayShape},
+    array::{unravel_index, ArrayError, ArrayIndices, ArrayShape},
     storage::byte_range::ByteRange,
 };
 
@@ -59,9 +59,14 @@ impl Indexer for ArraySubset {
             && std::iter::zip(self.end_exc(), array_shape).all(|(end, shape)| end <= *shape)
     }
 
-    fn find_on_axis(&self, index: &u64, axis: usize) -> u64 {
-        let shape = self.start();
-        shape[axis] + index
+    /// For a linearised index, unravel it and return the resulting [`ArrayIndices`] that represents
+    /// the `index`-th value of this [`Indexer`] i.e., for a range subset, `index` offset by [`start()`](Self::start())
+    fn find_linearised_index(&self, index: usize) -> ArrayIndices {
+        unravel_index(index as u64, self.shape())
+            .iter()
+            .enumerate()
+            .map(|(axis, val)| self.find_on_axis(val, axis))
+            .collect()
     }
 
     fn shape(&self) -> &[u64] {
@@ -85,6 +90,11 @@ impl Indexer for ArraySubset {
 }
 
 impl ArraySubset {
+
+    fn find_on_axis(&self, index: &u64, axis: usize) -> u64 {
+        let shape = self.start();
+        shape[axis] + index
+    }
     /// Create a new empty array subset.
     #[must_use]
     pub fn new_empty(dimensionality: usize) -> Self {
@@ -301,7 +311,7 @@ impl ArraySubset {
 
     /// Returns an iterator over the indices of elements within the subset.
     #[must_use]
-    pub fn indices(&self) -> Indices {
+    pub fn indices(&self) -> Indices<ArraySubset> {
         Indices::new(self.clone())
     }
 

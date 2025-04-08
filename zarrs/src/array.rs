@@ -229,7 +229,7 @@ pub fn chunk_shape_to_array_shape(chunk_shape: &[std::num::NonZeroU64]) -> Array
 /// //   The array shape must have been set (i.e. non-zero), otherwise the
 /// //   iterator will be empty
 /// let chunk_grid_shape = array.chunk_grid_shape().unwrap();
-/// let chunks: Indices = ArraySubset::new_with_shape(chunk_grid_shape).indices();
+/// let chunks: Indices<ArraySubset> = ArraySubset::new_with_shape(chunk_grid_shape).indices();
 ///
 /// // Iterate over chunk indices (in parallel)
 /// chunks.into_par_iter().try_for_each(|chunk_indices: Vec<u64>| {

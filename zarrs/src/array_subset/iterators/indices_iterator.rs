@@ -4,6 +4,7 @@ use crate::{
     array::{unravel_index, ArrayIndices},
     array_subset::ArraySubset,
     indexer::Indexer,
+    vindex::VIndex,
 };
 
 use rayon::iter::{
@@ -22,15 +23,15 @@ use rayon::iter::{
 /// (3, 0)  (3, 1)  (3, 2)
 /// ```
 /// An iterator with an array subset corresponding to the lower right 2x2 region will produce `[(2, 1), (2, 2), (3, 1), (3, 2)]`.
-pub struct Indices {
-    subset: ArraySubset,
+pub struct Indices<I: Indexer> {
+    subset: I,
     range: std::ops::Range<usize>,
 }
 
-impl Indices {
+impl<I: Indexer> Indices<I> {
     /// Create a new indices struct.
     #[must_use]
-    pub fn new(subset: ArraySubset) -> Self {
+    pub fn new(subset: I) -> Self {
         let length = subset.num_elements_usize();
         Self {
             subset,
@@ -41,7 +42,7 @@ impl Indices {
     /// Create a new indices struct spanning `range`.
     #[must_use]
     pub fn new_with_start_end(
-        subset: ArraySubset,
+        subset: I,
         range: impl std::ops::RangeBounds<usize>,
     ) -> Self {
         let length = subset.num_elements_usize();
@@ -75,14 +76,14 @@ impl Indices {
 
     /// Create a new serial iterator.
     #[must_use]
-    pub fn iter(&self) -> IndicesIterator<'_> {
+    pub fn iter(&self) -> IndicesIterator<'_, I> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
 
-impl<'a> IntoIterator for &'a Indices {
+impl<'a, I: Indexer> IntoIterator for &'a Indices<I> {
     type Item = ArrayIndices;
-    type IntoIter = IndicesIterator<'a>;
+    type IntoIter = IndicesIterator<'a, I>;
 
     fn into_iter(self) -> Self::IntoIter {
         IndicesIterator {
@@ -92,9 +93,9 @@ impl<'a> IntoIterator for &'a Indices {
     }
 }
 
-impl<'a> IntoParallelIterator for &'a Indices {
+impl<'a, I: Indexer> IntoParallelIterator for &'a Indices<I> {
     type Item = ArrayIndices;
-    type Iter = ParIndicesIterator<'a>;
+    type Iter = ParIndicesIterator<'a, I>;
 
     fn into_par_iter(self) -> Self::Iter {
         ParIndicesIterator {
@@ -107,15 +108,15 @@ impl<'a> IntoParallelIterator for &'a Indices {
 /// Serial indices iterator.
 ///
 /// See [`Indices`].
-pub struct IndicesIterator<'a> {
-    subset: &'a ArraySubset,
+pub struct IndicesIterator<'a, I: Indexer> {
+    subset: &'a I,
     range: std::ops::Range<usize>,
 }
 
-impl<'a> IndicesIterator<'a> {
+impl<'a, I: Indexer> IndicesIterator<'a, I> {
     /// Create a new indices iterator.
     #[must_use]
-    pub(super) fn new(subset: &'a ArraySubset) -> Self {
+    pub(super) fn new(subset: &'a I) -> Self {
         let length = subset.num_elements_usize();
         Self {
             subset,
@@ -126,7 +127,7 @@ impl<'a> IndicesIterator<'a> {
     /// Create a new indices iterator spanning an explicit index range.
     #[must_use]
     pub(super) fn new_with_start_end(
-        subset: &'a ArraySubset,
+        subset: &'a I,
         range: impl Into<std::ops::Range<usize>>,
     ) -> Self {
         Self {
@@ -136,15 +137,12 @@ impl<'a> IndicesIterator<'a> {
     }
 }
 
-impl Iterator for IndicesIterator<'_> {
+impl <I: Indexer>Iterator for IndicesIterator<'_, I> {
     type Item = ArrayIndices;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut indices = unravel_index(self.range.start as u64, self.subset.shape());
-        std::iter::zip(indices.iter_mut(), self.subset.start())
-            .for_each(|(index, start)| *index += start);
-
-        if self.range.start < self.range.end {
+        if self.range.start < self.range.end && self.range.start < self.subset.num_elements_usize() {
+            let indices = self.subset.find_linearised_index(self.range.start);
             self.range.start += 1;
             Some(indices)
         } else {
@@ -158,13 +156,11 @@ impl Iterator for IndicesIterator<'_> {
     }
 }
 
-impl DoubleEndedIterator for IndicesIterator<'_> {
+impl <I: Indexer>DoubleEndedIterator for IndicesIterator<'_, I> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.range.end > self.range.start {
             self.range.end -= 1;
-            let mut indices = unravel_index(self.range.end as u64, self.subset.shape());
-            std::iter::zip(indices.iter_mut(), self.subset.start())
-                .for_each(|(index, start)| *index += start);
+            let indices = self.subset.find_linearised_index(self.range.end);
             Some(indices)
         } else {
             None
@@ -172,19 +168,19 @@ impl DoubleEndedIterator for IndicesIterator<'_> {
     }
 }
 
-impl ExactSizeIterator for IndicesIterator<'_> {}
+impl <I: Indexer>ExactSizeIterator for IndicesIterator<'_, I> {}
 
-impl FusedIterator for IndicesIterator<'_> {}
+impl <I: Indexer>FusedIterator for IndicesIterator<'_, I> {}
 
 /// Parallel indices iterator.
 ///
 /// See [`Indices`].
-pub struct ParIndicesIterator<'a> {
-    subset: &'a ArraySubset,
+pub struct ParIndicesIterator<'a, I: Indexer> {
+    subset: &'a I,
     range: std::ops::Range<usize>,
 }
 
-impl ParallelIterator for ParIndicesIterator<'_> {
+impl <I: Indexer>ParallelIterator for ParIndicesIterator<'_, I> {
     type Item = ArrayIndices;
 
     fn drive_unindexed<C>(self, consumer: C) -> C::Result
@@ -199,7 +195,7 @@ impl ParallelIterator for ParIndicesIterator<'_> {
     }
 }
 
-impl IndexedParallelIterator for ParIndicesIterator<'_> {
+impl <I: Indexer>IndexedParallelIterator for ParIndicesIterator<'_, I> {
     fn with_producer<CB: ProducerCallback<Self::Item>>(self, callback: CB) -> CB::Output {
         let producer = ParIndicesIteratorProducer::from(&self);
         callback.callback(producer)
@@ -215,14 +211,14 @@ impl IndexedParallelIterator for ParIndicesIterator<'_> {
 }
 
 #[derive(Debug)]
-pub(super) struct ParIndicesIteratorProducer<'a> {
-    pub(super) subset: &'a ArraySubset,
+pub(super) struct ParIndicesIteratorProducer<'a, I: Indexer> {
+    pub(super) subset: &'a I,
     pub(super) range: std::ops::Range<usize>,
 }
 
-impl<'a> Producer for ParIndicesIteratorProducer<'a> {
+impl<'a, I: Indexer> Producer for ParIndicesIteratorProducer<'a, I> {
     type Item = ArrayIndices;
-    type IntoIter = IndicesIterator<'a>;
+    type IntoIter = IndicesIterator<'a, I>;
 
     fn into_iter(self) -> Self::IntoIter {
         IndicesIterator::new_with_start_end(self.subset, self.range)
@@ -241,8 +237,8 @@ impl<'a> Producer for ParIndicesIteratorProducer<'a> {
     }
 }
 
-impl<'a> From<&'a ParIndicesIterator<'_>> for ParIndicesIteratorProducer<'a> {
-    fn from(iterator: &'a ParIndicesIterator<'_>) -> Self {
+impl<'a, I:Indexer> From<&'a ParIndicesIterator<'_, I>> for ParIndicesIteratorProducer<'a, I> {
+    fn from(iterator: &'a ParIndicesIterator<'_, I>) -> Self {
         Self {
             subset: iterator.subset,
             range: iterator.range.clone(),
@@ -252,6 +248,8 @@ impl<'a> From<&'a ParIndicesIterator<'_>> for ParIndicesIteratorProducer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::vindex::VIndex;
+
     use super::*;
 
     #[test]
@@ -289,5 +287,17 @@ mod tests {
             Indices::new_with_start_end(ArraySubset::new_with_ranges(&[1..3, 5..7]), 5..1);
         assert_eq!(indices.len(), 0);
         assert!(indices.is_empty());
+    }
+
+    #[test]
+    fn indices_iterator_from_vindex_full() {
+        let indices =
+            Indices::new_with_start_end(VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), 0..3);
+        assert_eq!(indices.len(), 3);
+        let mut iter = indices.iter();
+        assert_eq!(iter.next(), Some(vec![0, 1]));
+        assert_eq!(iter.next_back(), Some(vec![2, 2]));
+        assert_eq!(iter.next(), Some(vec![1, 0]));
+        assert_eq!(iter.next(), None);
     }
 }

@@ -36,19 +36,11 @@ pub trait Indexer: Send + Sync + Clone {
     }
     /// For a linearised index, unravel it and return the resulting [`ArrayIndices`] that represents
     /// the `index`-th value of this [`Indexer`] i.e., for a range subset, `index` offset by [`start()`](Self::start())
-    fn map_linearised_index(&self, index: usize) -> ArrayIndices {
-        unravel_index(index as u64, self.shape())
-            .iter()
-            .enumerate()
-            .map(|(axis, val)| self.find_on_axis(val, axis))
-            .collect()
-    }
+    fn find_linearised_index(&self, index: usize) -> ArrayIndices;
     /// Shape of the [`Indexer`]
     #[must_use]
     fn shape(&self) -> &[u64];
     /// Get the `index`-th value along an `axis` i.e., for a range subset, `index` offset by the `axis` of [`start()`](Self::start())
-    #[must_use]
-    fn find_on_axis(&self, index: &u64, axis: usize) -> u64;
     /// Returns true if this array subset is within the bounds of `subset`.
     #[must_use]
     fn inbounds(&self, subset: &impl Indexer) -> bool {

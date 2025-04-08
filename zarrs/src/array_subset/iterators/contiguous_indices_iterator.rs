@@ -135,7 +135,7 @@ impl<'a> IntoIterator for &'a ContiguousIndices {
 ///
 /// See [`ContiguousIndices`].
 pub struct ContiguousIndicesIterator<'a> {
-    inner: IndicesIterator<'a>,
+    inner: IndicesIterator<'a, ArraySubset>,
     contiguous_elements: u64,
 }
 

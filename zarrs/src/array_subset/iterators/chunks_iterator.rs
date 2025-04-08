@@ -41,7 +41,7 @@ use super::{
 /// ```
 ///
 pub struct Chunks {
-    indices: Indices,
+    indices: Indices<ArraySubset>,
     chunk_shape: Vec<u64>,
 }
 
@@ -130,7 +130,7 @@ impl<'a> IntoParallelIterator for &'a Chunks {
 ///
 /// See [`Chunks`].
 pub struct ChunksIterator<'a> {
-    inner: IndicesIterator<'a>,
+    inner: IndicesIterator<'a, ArraySubset>,
     chunk_shape: &'a [u64],
 }
 
@@ -174,7 +174,7 @@ impl FusedIterator for ChunksIterator<'_> {}
 ///
 /// See [`Chunks`].
 pub struct ParChunksIterator<'a> {
-    inner: ParIndicesIterator<'a>,
+    inner: ParIndicesIterator<'a, ArraySubset>,
     chunk_shape: &'a [u64],
 }
 
@@ -210,7 +210,7 @@ impl IndexedParallelIterator for ParChunksIterator<'_> {
 
 #[derive(Debug)]
 struct ParChunksIteratorProducer<'a> {
-    inner: ParIndicesIteratorProducer<'a>,
+    inner: ParIndicesIteratorProducer<'a, ArraySubset>,
     chunk_shape: &'a [u64],
 }
 

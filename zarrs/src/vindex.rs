@@ -33,8 +33,8 @@ impl Indexer for VIndex {
         &self.shape
     }
 
-    fn find_on_axis(&self, index: &u64, axis: usize) -> u64 {
-        self.indices[axis][*index as usize]
+    fn find_linearised_index(&self, index: usize) -> ArrayIndices {
+        self.indices.iter().map(|i| i[index]).collect::<Vec<_>>()
     }
 
     fn end_exc(&self) -> ArrayIndices {
@@ -81,14 +81,14 @@ pub enum VIndexError{
 }
 
 impl VIndex {
-    fn new_from_indices(indices: Vec<ArrayIndices>) -> Result<Self, VIndexError> {
+    pub fn new_from_indices(indices: Vec<ArrayIndices>) -> Result<Self, VIndexError> {
         if !indices.iter().map(|x| x.len()).all_equal() {
             return Err(UnequalVIndexLengthsError::new(indices.into_iter().map(|x| x.len()).collect()).into());
         }
         if indices.len() == 0 || indices[0].len() == 0 {
             return Err(EmptyVIndexError.into());
         }
-        let shape = vec![indices[0].len() as u64; indices.len()];
+        let shape = vec![indices[0].len() as u64];
         let start = indices.iter().map(|i| i[0]).collect::<Vec<_>>();
         Ok(
             Self {
