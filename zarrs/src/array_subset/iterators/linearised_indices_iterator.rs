@@ -19,22 +19,23 @@ use super::IndicesIterator;
 /// 9  10  11
 /// ```
 /// An iterator with an array subset corresponding to the lower right 2x2 region will produce `[7, 8, 10, 11]`.
-pub struct LinearisedIndices {
-    subset: ArraySubset,
+pub struct LinearisedIndices<I: Indexer> {
+    subset: I,
     array_shape: ArrayShape,
 }
 
-impl LinearisedIndices {
+impl <I: Indexer>LinearisedIndices<I> {
     /// Create a new linearised indices iterator.
     ///
     /// # Errors
     /// Returns [`IncompatibleArraySubsetAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
-        subset: ArraySubset,
+        subset: I,
         array_shape: ArrayShape,
     ) -> Result<Self, IncompatibleArraySubsetAndShapeError> {
         if !subset.is_compatible_shape(&array_shape) {
-            return Err(IncompatibleArraySubsetAndShapeError(subset, array_shape));
+            // TODO: Resolve error behavior
+            return Err(IncompatibleArraySubsetAndShapeError(ArraySubset::new_with_shape(subset.shape().to_vec()), array_shape));
         };
         return Ok(Self {
             subset,
@@ -47,7 +48,7 @@ impl LinearisedIndices {
     /// # Safety
     /// `array_shape` must encapsulate `subset`.
     #[must_use]
-    pub unsafe fn new_unchecked(subset: ArraySubset, array_shape: ArrayShape) -> Self {
+    pub unsafe fn new_unchecked(subset: I, array_shape: ArrayShape) -> Self {
         debug_assert_eq!(subset.dimensionality(), array_shape.len());
         debug_assert!(
             std::iter::zip(subset.end_exc(), &array_shape).all(|(end, shape)| end <= *shape)
@@ -72,14 +73,14 @@ impl LinearisedIndices {
 
     /// Create a new serial iterator.
     #[must_use]
-    pub fn iter(&self) -> LinearisedIndicesIterator<'_> {
+    pub fn iter(&self) -> LinearisedIndicesIterator<'_, I> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
 
-impl<'a> IntoIterator for &'a LinearisedIndices {
+impl<'a, I: Indexer> IntoIterator for &'a LinearisedIndices<I> {
     type Item = u64;
-    type IntoIter = LinearisedIndicesIterator<'a>;
+    type IntoIter = LinearisedIndicesIterator<'a, I>;
 
     fn into_iter(self) -> Self::IntoIter {
         LinearisedIndicesIterator {
@@ -92,12 +93,12 @@ impl<'a> IntoIterator for &'a LinearisedIndices {
 /// Serial linearised indices iterator.
 ///
 /// See [`LinearisedIndices`].
-pub struct LinearisedIndicesIterator<'a> {
-    inner: IndicesIterator<'a, ArraySubset>,
+pub struct LinearisedIndicesIterator<'a, I: Indexer> {
+    inner: IndicesIterator<'a, I>,
     array_shape: &'a [u64],
 }
 
-impl Iterator for LinearisedIndicesIterator<'_> {
+impl <I: Indexer> Iterator for LinearisedIndicesIterator<'_, I> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -111,7 +112,7 @@ impl Iterator for LinearisedIndicesIterator<'_> {
     }
 }
 
-impl DoubleEndedIterator for LinearisedIndicesIterator<'_> {
+impl  <I: Indexer>DoubleEndedIterator for LinearisedIndicesIterator<'_, I> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner
             .next_back()
@@ -119,12 +120,14 @@ impl DoubleEndedIterator for LinearisedIndicesIterator<'_> {
     }
 }
 
-impl ExactSizeIterator for LinearisedIndicesIterator<'_> {}
+impl <I: Indexer> ExactSizeIterator for LinearisedIndicesIterator<'_, I> {}
 
-impl FusedIterator for LinearisedIndicesIterator<'_> {}
+impl <I: Indexer> FusedIterator for LinearisedIndicesIterator<'_, I> {}
 
 #[cfg(test)]
 mod tests {
+    use crate::vindex::VIndex;
+
     use super::*;
 
     #[test]
@@ -138,6 +141,21 @@ mod tests {
         assert_eq!(iter.next(), Some(14)); // [1,6]
         assert_eq!(iter.next_back(), Some(22)); // [2,6]
         assert_eq!(iter.next(), Some(21)); // [2,5]
+        assert_eq!(iter.next(), None);
+    }
+
+
+    #[test]
+    fn linearised_vindices_iterator_partial() {
+        let indices =
+            LinearisedIndices::new(VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), vec![8, 8])
+                .unwrap();
+        assert_eq!(indices.len(), 4);
+        let mut iter = indices.iter();
+        assert_eq!(iter.next(), Some(1)); // [0,1]
+        assert_eq!(iter.next(), Some(8)); // [1,0]
+        assert_eq!(iter.next_back(), Some(45)); // [5,5]
+        assert_eq!(iter.next(), Some(18)); // [2,2]
         assert_eq!(iter.next(), None);
     }
 

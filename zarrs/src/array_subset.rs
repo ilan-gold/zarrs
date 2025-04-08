@@ -323,7 +323,7 @@ impl ArraySubset {
     pub fn linearised_indices(
         &self,
         array_shape: &[u64],
-    ) -> Result<LinearisedIndices, IncompatibleArraySubsetAndShapeError> {
+    ) -> Result<LinearisedIndices<ArraySubset>, IncompatibleArraySubsetAndShapeError> {
         LinearisedIndices::new(self.clone(), array_shape.to_vec())
     }
 
