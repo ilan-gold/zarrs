@@ -100,7 +100,7 @@ pub enum VIndexError{
 
 impl VIndex {
     pub fn new_from_indices(indices: Vec<ArrayIndices>) -> Result<Self, VIndexError> {
-        if !indices.iter().map(|x| x.len()).all_equal() {
+        if !indices.iter().map(|x: &Vec<u64>| x.len()).all_equal() {
             return Err(UnequalVIndexLengthsError::new(indices.into_iter().map(|x| x.len()).collect()).into());
         }
         if indices.len() == 0 || indices[0].len() == 0 {
@@ -115,5 +115,46 @@ impl VIndex {
                 indices
             }
         )
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{indexer::Indexer, vindex::VIndexError};
+
+    use super::VIndex;
+
+
+    #[test]
+    fn vindex_new_ok() {
+        assert!(VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).is_ok())
+    }
+    #[test]
+    fn vindex_new_unequal() {
+        assert!(VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2]]).is_err_and(|x|
+            matches!(x, VIndexError::UnequalVIndexLengths(_))
+        ))
+    }
+
+    #[test]
+    fn vindex_new_empty() {
+        assert!(VIndex::new_from_indices(vec![]).is_err_and(|x|
+            matches!(x, VIndexError::EmptyVIndex(_))
+        ))
+    }
+
+    #[test]
+    fn vindex_byte_ranges() {
+        let indexer = VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap();
+        indexer.byte_ranges(vec![10, 10].as_slice(), 4)
+            .unwrap()
+            .iter()
+            .zip(vec![4, 40, 88, 220])
+            .for_each(|(byte_range, expected)| {
+                assert_eq!(byte_range.start(0), expected);
+                assert_eq!(byte_range.end(0), expected + 4);
+            });
     }
 }
