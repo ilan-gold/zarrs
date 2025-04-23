@@ -2,8 +2,8 @@ use std::iter::FusedIterator;
 
 use crate::{
     array::{ravel_indices, ArrayShape},
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
-    indexer::Indexer,
+    array_subset::ArraySubset,
+    indexer::{Indexer, IncompatibleIndexAndShapeError},
 };
 
 use super::IndicesIterator;
@@ -28,14 +28,14 @@ impl <I: Indexer>LinearisedIndices<I> {
     /// Create a new linearised indices iterator.
     ///
     /// # Errors
-    /// Returns [`IncompatibleArraySubsetAndShapeError`] if `array_shape` does not encapsulate `subset`.
+    /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
         subset: I,
         array_shape: ArrayShape,
-    ) -> Result<Self, IncompatibleArraySubsetAndShapeError> {
+    ) -> Result<Self, IncompatibleIndexAndShapeError> {
         if !subset.is_compatible_shape(&array_shape) {
             // TODO: Resolve error behavior
-            return Err(IncompatibleArraySubsetAndShapeError(ArraySubset::new_with_shape(subset.shape().to_vec()), array_shape));
+            return Err(IncompatibleIndexAndShapeError::new(array_shape));
         };
         return Ok(Self {
             subset,

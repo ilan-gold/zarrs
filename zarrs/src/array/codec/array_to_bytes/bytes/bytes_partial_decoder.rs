@@ -10,8 +10,7 @@ use crate::{
         },
         ArrayBytes, ArraySize, ChunkRepresentation, DataType,
     },
-    array_subset::IncompatibleArraySubsetAndShapeError,
-    indexer::Indexer,
+    indexer::{Indexer, IncompatibleIndexAndShapeError},
 };
 
 #[cfg(feature = "async")]
@@ -65,10 +64,9 @@ impl ArrayPartialDecoderTraits for BytesPartialDecoder {
             let byte_ranges = array_subset
                 .byte_ranges(&chunk_shape, data_type_size)
                 .map_err(|_| {
-                    IncompatibleArraySubsetAndShapeError::from((
-                        array_subset.clone(),
+                    IncompatibleIndexAndShapeError::new(
                         self.decoded_representation.shape_u64(),
-                    ))
+                    )
                 })?;
 
             // Decode
@@ -171,10 +169,9 @@ impl AsyncArrayPartialDecoderTraits for AsyncBytesPartialDecoder {
             let byte_ranges = array_subset
                 .byte_ranges(&chunk_shape, data_type_size)
                 .map_err(|_| {
-                    IncompatibleArraySubsetAndShapeError::from((
-                        array_subset.clone(),
+                    IncompatibleIndexAndShapeError::new(
                         self.decoded_representation.shape_u64(),
-                    ))
+                    )
                 })?;
 
             // Decode

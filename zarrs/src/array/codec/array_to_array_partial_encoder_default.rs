@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::{
     array::{array_bytes::update_array_bytes, ArrayBytes, ChunkRepresentation},
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
-    indexer::Indexer,
+    array_subset::ArraySubset,
+    indexer::{Indexer,IncompatibleIndexAndShapeError},
 };
 
 use super::{
@@ -67,8 +67,7 @@ fn partial_encode(
             .any(|(a, b)| *a > b.get())
         {
             return Err(CodecError::InvalidArraySubsetError(
-                IncompatibleArraySubsetAndShapeError::new(
-                    (*chunk_subset).clone(),
+                IncompatibleIndexAndShapeError::new(
                     decoded_representation.shape_u64(),
                 ),
             ));

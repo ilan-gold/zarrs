@@ -6,9 +6,9 @@ use thiserror::Error;
 use unsafe_cell_slice::UnsafeCellSlice;
 
 use crate::{
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    array_subset::ArraySubset,
     byte_range::extract_byte_ranges_concat_unchecked,
-    indexer::Indexer,
+    indexer::{Indexer, IncompatibleIndexAndShapeError},
     metadata::DataTypeSize,
 };
 
@@ -224,7 +224,7 @@ impl<'a> ArrayBytes<'a> {
         match self {
             ArrayBytes::Variable(bytes, offsets) => {
                 let indices = subset.linearised_indices(array_shape).map_err(|_| {
-                    IncompatibleArraySubsetAndShapeError::new(subset.clone(), array_shape.to_vec())
+                    IncompatibleIndexAndShapeError::new(array_shape.to_vec())
                 })?;
                 let mut bytes_length = 0;
                 for index in &indices {
@@ -327,10 +327,9 @@ pub(crate) fn update_bytes_vlen<'a>(
     update_bytes: &RawBytes,
     update_offsets: &RawBytesOffsets,
     update_subset: &ArraySubset,
-) -> Result<ArrayBytes<'a>, IncompatibleArraySubsetAndShapeError> {
+) -> Result<ArrayBytes<'a>, IncompatibleIndexAndShapeError> {
     if !update_subset.inbounds_shape(input_shape) {
-        return Err(IncompatibleArraySubsetAndShapeError::new(
-            update_subset.clone(),
+        return Err(IncompatibleIndexAndShapeError::new(
             input_shape.to_vec(),
         ));
     }

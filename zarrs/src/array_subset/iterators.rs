@@ -37,7 +37,7 @@ mod tests {
 
     use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-    use crate::array_subset::ArraySubset;
+    use crate::{array_subset::ArraySubset, indexer::Indexer};
 
     #[test]
     fn array_subset_iter_indices() {

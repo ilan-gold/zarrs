@@ -16,8 +16,7 @@ use crate::{
         },
         ArrayBytes, ArraySize, ChunkRepresentation, DataType,
     },
-    array_subset::IncompatibleArraySubsetAndShapeError,
-    indexer::Indexer,
+    indexer::{Indexer, IncompatibleIndexAndShapeError},
 };
 
 #[cfg(feature = "async")]
@@ -65,10 +64,9 @@ fn partial_decode<'a>(
         let bit_ranges = array_subset
             .byte_ranges(&chunk_shape, element_size_bits_usize)
             .map_err(|_| {
-                IncompatibleArraySubsetAndShapeError::from((
-                    array_subset.clone(),
+                IncompatibleIndexAndShapeError::new(
                     chunk_shape.clone(),
-                ))
+                )
             })?;
 
         // Convert to byte ranges, skipping the padding encoding byte

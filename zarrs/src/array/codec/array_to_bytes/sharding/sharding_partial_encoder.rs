@@ -21,9 +21,9 @@ use crate::{
         ravel_indices, transmute_to_bytes, ArrayBytes, ArraySize, ChunkRepresentation, ChunkShape,
         CodecChain, RawBytes,
     },
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    array_subset::ArraySubset,
     byte_range::ByteRange,
-    indexer::Indexer,
+    indexer::{Indexer, IncompatibleIndexAndShapeError},
 };
 
 use super::{sharding_index_decoded_representation, ShardingIndexLocation};
@@ -133,8 +133,7 @@ impl ArrayPartialEncoderTraits for ShardingPartialEncoder {
             self.chunk_grid
                 .chunks_in_array_subset(chunk_subset, &chunks_per_shard)
                 .map_err(|_| {
-                    CodecError::InvalidArraySubsetError(IncompatibleArraySubsetAndShapeError::new(
-                        (*chunk_subset).clone(),
+                    CodecError::InvalidArraySubsetError(IncompatibleIndexAndShapeError::new(
                         chunks_per_shard.clone(),
                     ))
                 })?
@@ -169,8 +168,7 @@ impl ArrayPartialEncoderTraits for ShardingPartialEncoder {
                 .any(|(a, b)| *a > b.get())
             {
                 return Err(CodecError::InvalidArraySubsetError(
-                    IncompatibleArraySubsetAndShapeError::new(
-                        (*chunk_subset).clone(),
+                    IncompatibleIndexAndShapeError::new(
                         self.decoded_representation.shape_u64(),
                     ),
                 ));

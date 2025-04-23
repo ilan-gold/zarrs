@@ -1,9 +1,10 @@
 use crate::array::{ArrayIndices, ArrayShape};
 
-use crate::indexer::Indexer;
+use crate::indexer::{IncompatibleIndexAndShapeError, Indexer};
 use itertools::Itertools;
 use derive_more::From;
 use thiserror::Error;
+use zarrs_storage::byte_range::ByteRange;
 
 // TODO: sorted for now assumed
 
@@ -49,6 +50,23 @@ impl Indexer for VIndex {
         self.indices.len()
     }
 
+    fn byte_ranges(
+        &self,
+        array_shape: &[u64],
+        element_size: usize,
+    ) -> Result<Vec<ByteRange>, IncompatibleIndexAndShapeError> {
+        let mut byte_ranges: Vec<ByteRange> = Vec::new();
+        let linearised_indices = self.linearised_indices(&array_shape)?;
+        for array_index in &linearised_indices {
+            let byte_index = array_index * element_size as u64;
+            byte_ranges.push(ByteRange::FromStart(byte_index, Some(element_size as u64)));
+        }
+        Ok(byte_ranges)
+    }
+
+    fn contains(&self, indices: &[u64]) -> bool {
+        indices.iter().zip(&self.indices).all(|(index, vindex)| vindex.contains(index) )
+    }
 }
 
 /// An incompatible array and array shape error.

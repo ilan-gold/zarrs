@@ -2,7 +2,8 @@ use std::iter::FusedIterator;
 
 use crate::{
     array::ravel_indices,
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    array_subset::ArraySubset,
+    indexer::IncompatibleIndexAndShapeError
 };
 
 use super::{contiguous_indices_iterator::ContiguousIndices, ContiguousIndicesIterator};
@@ -21,12 +22,15 @@ use super::{contiguous_indices_iterator::ContiguousIndices, ContiguousIndicesIte
 /// ```
 /// An iterator with an array subset covering the entire array will produce
 /// ```rust,ignore
-/// [(0, 9)]
+/// [0]
 /// ```
+/// with a `contiguous_elements{_usize}` of `9`.
+/// 
 /// An iterator with an array subset corresponding to the lower right 2x2 region will produce
 /// ```rust,ignore
-/// [(7, 2), (10, 2)]
+/// [7, 10]
 /// ```
+/// with a `contiguous_elements{_usize}` of `2`.
 pub struct ContiguousLinearisedIndices {
     inner: ContiguousIndices,
     array_shape: Vec<u64>,
@@ -37,11 +41,11 @@ impl ContiguousLinearisedIndices {
     ///
     /// # Errors
     ///
-    /// Returns [`IncompatibleArraySubsetAndShapeError`] if `array_shape` does not encapsulate `subset`.
+    /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
         subset: &ArraySubset,
         array_shape: Vec<u64>,
-    ) -> Result<Self, IncompatibleArraySubsetAndShapeError> {
+    ) -> Result<Self, IncompatibleIndexAndShapeError> {
         let inner = subset.contiguous_indices(&array_shape)?;
         Ok(Self { inner, array_shape })
     }

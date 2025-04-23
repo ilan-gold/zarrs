@@ -4,8 +4,8 @@ use itertools::izip;
 
 use crate::{
     array::ArrayIndices,
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
-    indexer::Indexer,
+    array_subset::ArraySubset,
+    indexer::{Indexer, IncompatibleIndexAndShapeError},
 };
 
 use super::IndicesIterator;
@@ -39,16 +39,15 @@ impl ContiguousIndices {
     /// Create a new contiguous indices iterator.
     ///
     /// # Errors
-    /// Returns [`IncompatibleArraySubsetAndShapeError`] if `array_shape` does not encapsulate `subset`.
+    /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
         subset: &ArraySubset,
         array_shape: &[u64],
-    ) -> Result<Self, IncompatibleArraySubsetAndShapeError> {
+    ) -> Result<Self, IncompatibleIndexAndShapeError> {
         if !(subset.dimensionality() == array_shape.len()
             && std::iter::zip(subset.end_exc(), array_shape).all(|(end, shape)| end <= *shape))
         {
-            return Err(IncompatibleArraySubsetAndShapeError(
-                subset.clone(),
+            return Err(IncompatibleIndexAndShapeError::new(
                 array_shape.to_vec(),
             ));
         }

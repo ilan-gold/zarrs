@@ -41,6 +41,7 @@ use crate::{
     array::codec::{Codec, CodecPlugin},
     metadata::v3::MetadataV3,
     plugin::{PluginCreateError, PluginMetadataInvalidError},
+    indexer::Indexer
 };
 
 pub use crate::metadata::codec::bz2::{

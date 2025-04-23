@@ -1,7 +1,25 @@
 //! Indexer trait with common functionality
+use derive_more::From;
 use itertools::izip;
+use zarrs_metadata::ArrayShape;
+use zarrs_storage::byte_range::ByteRange;
+use thiserror::Error;
 
-use crate::array::{unravel_index, ArrayIndices};
+use crate::{array::ArrayIndices, array_subset::iterators::LinearisedIndices};
+
+/// An incompatible array and array shape error.
+#[derive(Clone, Debug, Error, From)]
+#[error("incompatible indexer with array shape {0:?}")]
+pub struct IncompatibleIndexAndShapeError(ArrayShape);
+
+impl IncompatibleIndexAndShapeError {
+    /// Create a new incompatible array index and shape error.
+    #[must_use]
+    pub fn new(array_shape: ArrayShape) -> Self {
+        Self(array_shape)
+    }
+}
+
 pub trait Indexer: Send + Sync + Clone {
     /// Return the number of elements of the array subset.
     ///
@@ -67,4 +85,31 @@ pub trait Indexer: Send + Sync + Clone {
     /// Return the end (exclusive) of the array subset.
     #[must_use]
     fn end_exc(&self) -> ArrayIndices;
+
+    /// Return the byte ranges of an array subset in an array with `array_shape` and `element_size`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IncompatibleIndexAndShapeError`] if the `array_shape` does not encapsulate this array subset.
+    fn byte_ranges(
+        &self,
+        array_shape: &[u64],
+        element_size: usize,
+    ) -> Result<Vec<ByteRange>, IncompatibleIndexAndShapeError>;
+
+        /// Returns an iterator over the linearised indices of elements within the subset.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IncompatibleIndexAndShapeError`] if the `array_shape` does not encapsulate this array subset.
+    fn linearised_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<LinearisedIndices<Self>, IncompatibleIndexAndShapeError> {
+        LinearisedIndices::new(self.clone(), array_shape.to_vec())
+    }
+
+    /// Returns [`true`] if the array subset contains `indices`.
+    #[must_use]
+    fn contains(&self, indices: &[u64]) -> bool;
 }

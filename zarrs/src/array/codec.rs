@@ -90,7 +90,6 @@ pub use array_to_bytes_partial_encoder_default::ArrayToBytesPartialEncoderDefaul
 pub use array_to_bytes_partial_encoder_default::AsyncArrayToBytesPartialEncoderDefault;
 
 use crate::array_subset::IncompatibleDimensionalityError;
-use crate::indexer::Indexer;
 mod array_to_array_partial_decoder_default;
 pub use array_to_array_partial_decoder_default::ArrayToArrayPartialDecoderDefault;
 #[cfg(feature = "async")]
@@ -118,11 +117,12 @@ use zarrs_plugin::{MetadataConfiguration, PluginUnsupportedError};
 use crate::config::global_config;
 use crate::storage::{StoreKeyOffsetValue, WritableStorage};
 use crate::{
-    array_subset::{ArraySubset, IncompatibleArraySubsetAndShapeError},
+    array_subset::ArraySubset,
     byte_range::{extract_byte_ranges_read_seek, ByteOffset, ByteRange, InvalidByteRangeError},
     metadata::v3::MetadataV3,
     plugin::{Plugin, PluginCreateError},
     storage::{ReadableStorage, StorageError, StoreKey},
+    indexer::{IncompatibleIndexAndShapeError, Indexer}
 };
 
 #[cfg(feature = "async")]
@@ -1351,7 +1351,7 @@ pub enum CodecError {
     InvalidByteRangeError(#[from] InvalidByteRangeError),
     /// An invalid array subset was requested.
     #[error(transparent)]
-    InvalidArraySubsetError(#[from] IncompatibleArraySubsetAndShapeError),
+    InvalidArraySubsetError(#[from] IncompatibleIndexAndShapeError),
     /// An invalid array subset was requested with the wrong dimensionality.
     #[error("the array subset {_0} has the wrong dimensionality, expected {_1}")]
     InvalidArraySubsetDimensionalityError(ArraySubset, usize),
