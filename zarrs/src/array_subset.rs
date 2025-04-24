@@ -107,6 +107,45 @@ impl Indexer for ArraySubset {
         izip!(indices, &self.start, &self.shape).all(|(&i, &o, &s)| i >= o && i < o + s)
     }
 
+
+    fn overlap_array_subset(&self, subset_other: &ArraySubset) -> Result<Self, IncompatibleDimensionalityError> {
+        if subset_other.dimensionality() == self.dimensionality() {
+            let mut ranges = Vec::with_capacity(self.dimensionality());
+            for (start, size, other_start, other_size) in izip!(
+                &self.start,
+                &self.shape,
+                subset_other.start(),
+                subset_other.shape(),
+            ) {
+                let overlap_start = *std::cmp::max(start, other_start);
+                let overlap_end = std::cmp::min(start + size, other_start + other_size);
+                ranges.push(overlap_start..overlap_end);
+            }
+            Ok(Self::new_with_ranges(&ranges))
+        } else {
+            Err(IncompatibleDimensionalityError::new(
+                subset_other.dimensionality(),
+                self.dimensionality(),
+            ))
+        }
+    }
+
+    fn relative_to(&self, start: &[u64]) -> Result<Self, IncompatibleDimensionalityError> {
+        if start.len() == self.dimensionality() {
+            Ok(Self {
+                start: std::iter::zip(self.start(), start)
+                    .map(|(a, b)| a - b)
+                    .collect::<Vec<_>>(),
+                shape: self.shape().to_vec(),
+            })
+        } else {
+            Err(IncompatibleDimensionalityError::new(
+                start.len(),
+                self.dimensionality(),
+            ))
+        }
+    }
+
 }
 
 impl ArraySubset {
@@ -345,55 +384,6 @@ impl ArraySubset {
     ) -> Result<Chunks, IncompatibleDimensionalityError> {
         Chunks::new(self, chunk_shape)
     }
-
-    /// Return the overlapping subset between this array subset and `subset_other`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IncompatibleDimensionalityError`] if the dimensionality of `subset_other` does not match the dimensionality of this array subset.
-    pub fn overlap(&self, subset_other: &Self) -> Result<Self, IncompatibleDimensionalityError> {
-        if subset_other.dimensionality() == self.dimensionality() {
-            let mut ranges = Vec::with_capacity(self.dimensionality());
-            for (start, size, other_start, other_size) in izip!(
-                &self.start,
-                &self.shape,
-                subset_other.start(),
-                subset_other.shape(),
-            ) {
-                let overlap_start = *std::cmp::max(start, other_start);
-                let overlap_end = std::cmp::min(start + size, other_start + other_size);
-                ranges.push(overlap_start..overlap_end);
-            }
-            Ok(Self::new_with_ranges(&ranges))
-        } else {
-            Err(IncompatibleDimensionalityError::new(
-                subset_other.dimensionality(),
-                self.dimensionality(),
-            ))
-        }
-    }
-
-    /// Return the subset relative to `start`.
-    ///
-    /// Creates an array subset starting at [`ArraySubset::start()`] - `start`.
-    ///
-    /// # Errors
-    /// Returns [`IncompatibleDimensionalityError`] if the length of `start` does not match the dimensionality of this array subset.
-    pub fn relative_to(&self, start: &[u64]) -> Result<Self, IncompatibleDimensionalityError> {
-        if start.len() == self.dimensionality() {
-            Ok(Self {
-                start: std::iter::zip(self.start(), start)
-                    .map(|(a, b)| a - b)
-                    .collect::<Vec<_>>(),
-                shape: self.shape().to_vec(),
-            })
-        } else {
-            Err(IncompatibleDimensionalityError::new(
-                start.len(),
-                self.dimensionality(),
-            ))
-        }
-    }
 }
 
 /// An incompatible dimensionality error.
@@ -460,7 +450,7 @@ mod tests {
         let array_subset0 = ArraySubset::new_with_ranges(&[1..5, 2..6]);
         let array_subset1 = ArraySubset::new_with_ranges(&[3..6, 4..7]);
         assert_eq!(
-            array_subset0.overlap(&array_subset1).unwrap(),
+            array_subset0.overlap_array_subset(&array_subset1).unwrap(),
             ArraySubset::new_with_ranges(&[3..5, 4..6])
         );
         assert_eq!(
@@ -479,7 +469,7 @@ mod tests {
         assert_eq!(array_subset0.to_ranges(), vec![1..5, 2..6]);
 
         let array_subset2 = ArraySubset::new_with_ranges(&[3..6, 4..7, 0..1]);
-        assert!(array_subset0.overlap(&array_subset2).is_err());
+        assert!(array_subset0.overlap_array_subset(&array_subset2).is_err());
         assert_eq!(
             array_subset2
                 .linearised_indices(&[6, 7, 1])

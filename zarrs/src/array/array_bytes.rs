@@ -215,9 +215,9 @@ impl<'a> ArrayBytes<'a> {
     ///
     /// # Panics
     /// Panics if indices in the subset exceed [`usize::MAX`].
-    pub fn extract_array_subset(
+    pub fn extract_array_subset<I: Indexer>(
         &self,
-        subset: &ArraySubset,
+        subset: &I,
         array_shape: &[u64],
         data_type: &DataType,
     ) -> Result<ArrayBytes<'_>, CodecError> {

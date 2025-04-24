@@ -280,7 +280,7 @@ impl ArrayPartialEncoderTraits for ShardingPartialEncoder {
                         .expect("already validated")
                         .expect("regular grid");
                     let inner_chunk_subset_overlap =
-                        chunk_subset.overlap(&inner_chunk_subset).unwrap();
+                        chunk_subset.overlap_array_subset(&inner_chunk_subset).unwrap();
                     let inner_chunk_bytes = chunk_subset_bytes.extract_array_subset(
                         &inner_chunk_subset_overlap
                             .relative_to(chunk_subset.start())

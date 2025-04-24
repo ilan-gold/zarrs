@@ -606,7 +606,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
                             let options = options.clone();
                             async move {
                                 let chunk_subset = self.chunk_subset(&chunk_indices)?;
-                                let chunk_subset_overlap = chunk_subset.overlap(array_subset)?;
+                                let chunk_subset_overlap = chunk_subset.overlap_array_subset(array_subset)?;
                                 Ok::<_, ArrayError>((
                                     self.async_retrieve_chunk_subset_opt(
                                         &chunk_indices,
@@ -646,7 +646,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
                                 async move {
                                     let chunk_subset = self.chunk_subset(&chunk_indices)?;
                                     let chunk_subset_overlap =
-                                        chunk_subset.overlap(array_subset)?;
+                                        chunk_subset.overlap_array_subset(array_subset)?;
 
                                     let mut output_view = unsafe {
                                         ArrayBytesFixedDisjointView::new(

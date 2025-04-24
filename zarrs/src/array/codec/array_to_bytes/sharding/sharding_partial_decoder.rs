@@ -185,7 +185,7 @@ impl ArrayPartialDecoderTraits for ShardingPartialDecoder {
                         let size = shard_index[shard_index_idx + 1];
 
                         // Get the subset of bytes from the chunk which intersect the array
-                        let chunk_subset_overlap = array_subset.overlap(&chunk_subset)?;
+                        let chunk_subset_overlap = array_subset.overlap_array_subset(&chunk_subset)?;
 
                         let chunk_subset_bytes = if offset == u64::MAX && size == u64::MAX {
                             let array_size = ArraySize::new(
@@ -264,7 +264,7 @@ impl ArrayPartialDecoderTraits for ShardingPartialDecoder {
                         let size = shard_index[shard_index_idx + 1];
 
                         // Get the subset of bytes from the chunk which intersect the array
-                        let chunk_subset_overlap = array_subset.overlap(&chunk_subset)?;
+                        let chunk_subset_overlap = array_subset.overlap_array_subset(&chunk_subset)?;
 
                         let decoded_bytes = if offset == u64::MAX && size == u64::MAX {
                             let array_size = ArraySize::new(
@@ -443,7 +443,7 @@ impl AsyncArrayPartialDecoderTraits for AsyncShardingPartialDecoder {
                             let size = shard_index[shard_index_idx + 1];
 
                             // Get the subset of bytes from the chunk which intersect the array
-                            let chunk_subset_overlap = array_subset.overlap(&chunk_subset).unwrap(); // FIXME: unwrap
+                            let chunk_subset_overlap = array_subset.overlap_array_subset(&chunk_subset).unwrap(); // FIXME: unwrap
 
                             let chunk_subset_bytes = if offset == u64::MAX && size == u64::MAX {
                                 let array_size = ArraySize::new(
@@ -561,7 +561,7 @@ impl AsyncArrayPartialDecoderTraits for AsyncShardingPartialDecoder {
                                     } else {
                                         err
                                     })?;
-                                let chunk_subset_overlap = array_subset.overlap(chunk_subset).unwrap(); // FIXME: unwrap
+                                let chunk_subset_overlap = array_subset.overlap_array_subset(chunk_subset).unwrap(); // FIXME: unwrap
                                 // Partial decoding is actually really slow with the blosc codec! Assume sharded chunks are small, and just decode the whole thing and extract bytes
                                 // TODO: Investigate further
                                 // let decoded_chunk = partial_decoder
@@ -636,7 +636,7 @@ impl AsyncArrayPartialDecoderTraits for AsyncShardingPartialDecoder {
                             filled_chunks,
                             try_for_each,
                             |chunk_subset: &ArraySubset| {
-                                let chunk_subset_overlap = array_subset.overlap(chunk_subset)?;
+                                let chunk_subset_overlap = array_subset.overlap_array_subset(chunk_subset)?;
                                 let mut output_view = unsafe {
                                     // SAFETY: chunks represent disjoint array subsets
                                     ArrayBytesFixedDisjointView::new(

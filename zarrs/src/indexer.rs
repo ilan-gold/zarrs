@@ -5,7 +5,7 @@ use zarrs_metadata::ArrayShape;
 use zarrs_storage::byte_range::ByteRange;
 use thiserror::Error;
 
-use crate::{array::ArrayIndices, array_subset::iterators::LinearisedIndices};
+use crate::{array::ArrayIndices, array_subset::{iterators::LinearisedIndices, ArraySubset, IncompatibleDimensionalityError}};
 
 /// An incompatible array and array shape error.
 #[derive(Clone, Debug, Error, From)]
@@ -112,4 +112,19 @@ pub trait Indexer: Send + Sync + Clone {
     /// Returns [`true`] if the array subset contains `indices`.
     #[must_use]
     fn contains(&self, indices: &[u64]) -> bool;
+
+        /// Return the overlapping subset between this array subset and `subset_other`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IncompatibleDimensionalityError`] if the dimensionality of `subset_other` does not match the dimensionality of this array subset.
+    fn overlap_array_subset(&self, subset_other: &ArraySubset) -> Result<Self, IncompatibleDimensionalityError>;
+    
+    /// Return the subset relative to `start`.
+    ///
+    /// Creates an array subset starting at [`ArraySubset::start()`] - `start`.
+    ///
+    /// # Errors
+    /// Returns [`IncompatibleDimensionalityError`] if the length of `start` does not match the dimensionality of this array subset.
+    fn relative_to(&self, start: &[u64]) -> Result<Self, IncompatibleDimensionalityError>;
 }

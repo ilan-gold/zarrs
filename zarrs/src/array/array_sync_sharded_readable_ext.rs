@@ -558,7 +558,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
                             ArrayError,
                         > {
                             let shard_subset = self.chunk_subset(&shard_indices)?;
-                            let shard_subset_overlap = shard_subset.overlap(array_subset)?;
+                            let shard_subset_overlap = shard_subset.overlap_array_subset(array_subset)?;
                             let bytes = cache
                                 .retrieve(self, &shard_indices)?
                                 .partial_decode(
@@ -598,7 +598,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
                                 UnsafeCellSlice::new_from_vec_with_spare_capacity(&mut output);
                             let retrieve_shard_into_slice = |shard_indices: Vec<u64>| {
                                 let shard_subset = self.chunk_subset(&shard_indices)?;
-                                let shard_subset_overlap = shard_subset.overlap(array_subset)?;
+                                let shard_subset_overlap = shard_subset.overlap_array_subset(array_subset)?;
                                 // let shard_subset_bytes = self.retrieve_chunk_subset_opt(
                                 //     &shard_indices,
                                 //     &shard_subset_overlap.relative_to(shard_subset.start())?,

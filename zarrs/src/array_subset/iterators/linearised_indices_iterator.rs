@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn linearised_vindices_iterator_partial() {
         let indices =
-            LinearisedIndices::new(VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), vec![8, 8])
+            LinearisedIndices::new(VIndex::new_from_dimension_first_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), vec![8, 8])
                 .unwrap();
         assert_eq!(indices.len(), 4);
         let mut iter = indices.iter();

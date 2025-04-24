@@ -394,7 +394,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayChunkCacheExt<TSto
                                 ArraySubset,
                             )| {
                                 // Extract the overlapping bytes
-                                let chunk_subset_overlap = chunk_subset.overlap(array_subset)?;
+                                let chunk_subset_overlap = chunk_subset.overlap_array_subset(array_subset)?;
                                 let chunk_subset_bytes = if chunk_subset_overlap == chunk_subset {
                                     chunk_subset_bytes
                                 } else {

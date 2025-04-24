@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn indices_iterator_from_vindex_full() {
         let indices =
-            Indices::new_with_start_end(VIndex::new_from_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), 0..3);
+            Indices::new_with_start_end(VIndex::new_from_dimension_first_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), 0..3);
         assert_eq!(indices.len(), 3);
         let mut iter = indices.iter();
         assert_eq!(iter.next(), Some(vec![0, 1]));

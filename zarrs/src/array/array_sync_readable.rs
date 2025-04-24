@@ -680,7 +680,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> Array<TStorage> {
                             ArrayError,
                         > {
                             let chunk_subset = self.chunk_subset(&chunk_indices)?;
-                            let chunk_subset_overlap = chunk_subset.overlap(array_subset)?;
+                            let chunk_subset_overlap = chunk_subset.overlap_array_subset(array_subset)?;
                             Ok((
                                 self.retrieve_chunk_subset_opt(
                                     &chunk_indices,
@@ -717,7 +717,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> Array<TStorage> {
                                 UnsafeCellSlice::new_from_vec_with_spare_capacity(&mut output);
                             let retrieve_chunk = |chunk_indices: Vec<u64>| {
                                 let chunk_subset = self.chunk_subset(&chunk_indices)?;
-                                let chunk_subset_overlap = chunk_subset.overlap(array_subset)?;
+                                let chunk_subset_overlap = chunk_subset.overlap_array_subset(array_subset)?;
                                 let mut output_view = unsafe {
                                     // SAFETY: chunks represent disjoint array subsets
                                     ArrayBytesFixedDisjointView::new(
