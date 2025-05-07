@@ -5,7 +5,7 @@ use zarrs_metadata::ArrayShape;
 use zarrs_storage::byte_range::ByteRange;
 use thiserror::Error;
 
-use crate::{array::ArrayIndices, array_subset::{iterators::LinearisedIndices, ArraySubset, IncompatibleDimensionalityError}};
+use crate::{array::ArrayIndices, array_subset::{iterators::{ContiguousIndices, ContiguousLinearisedIndices, LinearisedIndices}, ArraySubset, IncompatibleDimensionalityError}};
 
 /// An incompatible array and array shape error.
 #[derive(Clone, Debug, Error, From)]
@@ -127,4 +127,24 @@ pub trait Indexer: Send + Sync + Clone {
     /// # Errors
     /// Returns [`IncompatibleDimensionalityError`] if the length of `start` does not match the dimensionality of this array subset.
     fn relative_to(&self, start: &[u64]) -> Result<Self, IncompatibleDimensionalityError>;
+
+        /// Returns an iterator over the indices of contiguous elements within the subset.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IncompatibleIndexAndShapeError`] if the `array_shape` does not encapsulate this array subset.
+    fn contiguous_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<ContiguousIndices<Self>, IncompatibleIndexAndShapeError>;
+
+    /// Returns an iterator over the linearised indices of contiguous elements within the subset.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IncompatibleIndexAndShapeError`] if the `array_shape` does not encapsulate this array subset.
+    fn contiguous_linearised_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<ContiguousLinearisedIndices<Self>, IncompatibleIndexAndShapeError>;
 }

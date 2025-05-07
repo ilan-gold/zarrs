@@ -30,58 +30,24 @@ use super::IndicesIterator;
 /// ```rust,ignore
 /// [((2, 1), 2), ((3, 1), 2)]
 /// ```
-pub struct ContiguousIndices {
-    subset_contiguous_start: ArraySubset,
+pub struct ContiguousIndices<I: Indexer> {
+    subset_contiguous_start: I,
     contiguous_elements: u64,
 }
 
-impl ContiguousIndices {
+impl<I: Indexer> ContiguousIndices<I> {
     /// Create a new contiguous indices iterator.
     ///
     /// # Errors
     /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
-        subset: &ArraySubset,
-        array_shape: &[u64],
-    ) -> Result<Self, IncompatibleIndexAndShapeError> {
-        if !(subset.dimensionality() == array_shape.len()
-            && std::iter::zip(subset.end_exc(), array_shape).all(|(end, shape)| end <= *shape))
-        {
-            return Err(IncompatibleIndexAndShapeError::new(
-                array_shape.to_vec(),
-            ));
-        }
-        let mut contiguous = true;
-        let mut contiguous_elements = 1;
-        let mut shape_out: Vec<u64> = Vec::with_capacity(array_shape.len());
-        for (&subset_start, &subset_size, &array_size, shape_out_i) in izip!(
-            subset.start().iter().rev(),
-            subset.shape().iter().rev(),
-            array_shape.iter().rev(),
-            shape_out.spare_capacity_mut().iter_mut().rev(),
-        ) {
-            if contiguous {
-                contiguous_elements *= subset_size;
-                shape_out_i.write(1);
-                contiguous = subset_start == 0 && subset_size == array_size;
-            } else {
-                shape_out_i.write(subset_size);
-            }
-        }
-        // SAFETY: each element is initialised
-        unsafe { shape_out.set_len(array_shape.len()) };
-        let ranges = subset
-            .start()
-            .iter()
-            .zip(shape_out)
-            .map(|(&st, sh)| st..(st + sh))
-            .collect::<Vec<_>>();
-        let subset_contiguous_start = ArraySubset::new_with_ranges(&ranges);
-        // let inner = subset_contiguous_start.iter_indices();
-        Ok(Self {
+        subset_contiguous_start: I,
+        contiguous_elements: u64,
+    ) -> Self {
+        Self {
             subset_contiguous_start,
             contiguous_elements,
-        })
+        }
     }
 
     /// Return the number of starting indices (i.e. the length of the iterator).
@@ -113,14 +79,14 @@ impl ContiguousIndices {
 
     /// Create a new serial iterator.
     #[must_use]
-    pub fn iter(&self) -> ContiguousIndicesIterator<'_> {
+    pub fn iter(&self) -> ContiguousIndicesIterator<'_, I> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
 
-impl<'a> IntoIterator for &'a ContiguousIndices {
+impl<'a, I: Indexer> IntoIterator for &'a ContiguousIndices<I> {
     type Item = ArrayIndices;
-    type IntoIter = ContiguousIndicesIterator<'a>;
+    type IntoIter = ContiguousIndicesIterator<'a, I>;
 
     fn into_iter(self) -> Self::IntoIter {
         ContiguousIndicesIterator {
@@ -133,12 +99,12 @@ impl<'a> IntoIterator for &'a ContiguousIndices {
 /// Serial contiguous indices iterator.
 ///
 /// See [`ContiguousIndices`].
-pub struct ContiguousIndicesIterator<'a> {
-    inner: IndicesIterator<'a, ArraySubset>,
+pub struct ContiguousIndicesIterator<'a, I: Indexer> {
+    inner: IndicesIterator<'a, I>,
     contiguous_elements: u64,
 }
 
-impl ContiguousIndicesIterator<'_> {
+impl<I: Indexer> ContiguousIndicesIterator<'_, I> {
     /// Return the number of contiguous elements (fixed on each iteration).
     #[must_use]
     pub fn contiguous_elements(&self) -> u64 {
@@ -155,7 +121,7 @@ impl ContiguousIndicesIterator<'_> {
     }
 }
 
-impl Iterator for ContiguousIndicesIterator<'_> {
+impl<I: Indexer> Iterator for ContiguousIndicesIterator<'_, I> {
     type Item = ArrayIndices;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -167,12 +133,12 @@ impl Iterator for ContiguousIndicesIterator<'_> {
     }
 }
 
-impl DoubleEndedIterator for ContiguousIndicesIterator<'_> {
+impl<I: Indexer> DoubleEndedIterator for ContiguousIndicesIterator<'_, I> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner.next_back()
     }
 }
 
-impl ExactSizeIterator for ContiguousIndicesIterator<'_> {}
+impl <I: Indexer> ExactSizeIterator for ContiguousIndicesIterator<'_, I> {}
 
-impl FusedIterator for ContiguousIndicesIterator<'_> {}
+impl <I: Indexer> FusedIterator for ContiguousIndicesIterator<'_, I> {}

@@ -207,7 +207,7 @@ impl<'a> ArrayBytes<'a> {
             Self::Variable(bytes, _offsets) => fill_value.equals_all(bytes),
         }
     }
-
+ 
     /// Extract a subset of the array bytes.
     ///
     /// # Errors
@@ -571,10 +571,10 @@ pub(crate) fn extract_decoded_regions_vlen<'a>(
 ///  - `data_type` and `fill_value` are compatible,
 ///  - `output` holds enough space for the preallocated bytes of an array with `output_shape` and `data_type`, and
 ///  - `output_subset` is within the bounds of `output_shape`.
-pub fn copy_fill_value_into(
+pub fn copy_fill_value_into<I: Indexer>(
     data_type: &DataType,
     fill_value: &FillValue,
-    output_view: &mut ArrayBytesFixedDisjointView,
+    output_view: &mut ArrayBytesFixedDisjointView<I>,
 ) -> Result<(), CodecError> {
     let array_size = ArraySize::new(data_type.size(), output_view.num_elements());
     if let ArrayBytes::Fixed(fill_value_bytes) = ArrayBytes::new_fill_value(array_size, fill_value)

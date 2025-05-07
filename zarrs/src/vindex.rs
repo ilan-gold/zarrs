@@ -1,5 +1,6 @@
 use crate::array::{ArrayIndices, ArrayShape};
 
+use crate::array_subset::iterators::{ContiguousIndices, ContiguousLinearisedIndices};
 use crate::array_subset::{ArraySubset, IncompatibleDimensionalityError};
 use crate::indexer::{IncompatibleIndexAndShapeError, Indexer};
 use itertools::{izip, Itertools};
@@ -136,6 +137,26 @@ impl Indexer for VIndex {
                 self.dimensionality(),
             ))
         }
+    }
+    fn contiguous_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<ContiguousIndices<Self>, IncompatibleIndexAndShapeError> {
+        if !(self.dimensionality() == array_shape.len()
+            && std::iter::zip(self.end_exc(), array_shape).all(|(end, shape)| end <= *shape))
+        {
+            return Err(IncompatibleIndexAndShapeError::new(
+                array_shape.to_vec(),
+            ));
+        }
+        Ok(ContiguousIndices::new(self.clone(), 1))
+    }
+
+    fn contiguous_linearised_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<ContiguousLinearisedIndices<Self>, IncompatibleIndexAndShapeError> {
+        ContiguousLinearisedIndices::new(self, array_shape.to_vec())
     }
 }
 

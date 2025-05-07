@@ -146,6 +146,57 @@ impl Indexer for ArraySubset {
         }
     }
 
+    fn contiguous_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<ContiguousIndices<ArraySubset>, IncompatibleIndexAndShapeError> {
+        if !(self.dimensionality() == array_shape.len()
+            && std::iter::zip(self.end_exc(), array_shape).all(|(end, shape)| end <= *shape))
+        {
+            return Err(IncompatibleIndexAndShapeError::new(
+                array_shape.to_vec(),
+            ));
+        }
+        let mut contiguous = true;
+        let mut contiguous_elements = 1;
+        let mut shape_out: Vec<u64> = Vec::with_capacity(array_shape.len());
+        for (&subset_start, &subset_size, &array_size, shape_out_i) in izip!(
+            self.start().iter().rev(),
+            self.shape().iter().rev(),
+            array_shape.iter().rev(),
+            shape_out.spare_capacity_mut().iter_mut().rev(),
+        ) {
+            if contiguous {
+                contiguous_elements *= subset_size;
+                shape_out_i.write(1);
+                contiguous = subset_start == 0 && subset_size == array_size;
+            } else {
+                shape_out_i.write(subset_size);
+            }
+        }
+        // SAFETY: each element is initialised
+        unsafe { shape_out.set_len(array_shape.len()) };
+        let ranges = self
+            .start()
+            .iter()
+            .zip(shape_out)
+            .map(|(&st, sh)| st..(st + sh))
+            .collect::<Vec<_>>();
+        let subset_contiguous_start = ArraySubset::new_with_ranges(&ranges);
+        // let inner = subset_contiguous_start.iter_indices();
+        Ok(ContiguousIndices::new(
+            subset_contiguous_start,
+            contiguous_elements,
+        ))
+    }
+
+    fn contiguous_linearised_indices(
+        &self,
+        array_shape: &[u64],
+    ) -> Result<ContiguousLinearisedIndices<Self>, IncompatibleIndexAndShapeError> {
+        ContiguousLinearisedIndices::new(self, array_shape.to_vec())
+    }
+
 }
 
 impl ArraySubset {
@@ -345,30 +396,6 @@ impl ArraySubset {
     #[must_use]
     pub fn indices(&self) -> Indices<ArraySubset> {
         Indices::new(self.clone())
-    }
-
-    /// Returns an iterator over the indices of contiguous elements within the subset.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IncompatibleIndexAndShapeError`] if the `array_shape` does not encapsulate this array subset.
-    pub fn contiguous_indices(
-        &self,
-        array_shape: &[u64],
-    ) -> Result<ContiguousIndices, IncompatibleIndexAndShapeError> {
-        ContiguousIndices::new(self, array_shape)
-    }
-
-    /// Returns an iterator over the linearised indices of contiguous elements within the subset.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IncompatibleIndexAndShapeError`] if the `array_shape` does not encapsulate this array subset.
-    pub fn contiguous_linearised_indices(
-        &self,
-        array_shape: &[u64],
-    ) -> Result<ContiguousLinearisedIndices, IncompatibleIndexAndShapeError> {
-        ContiguousLinearisedIndices::new(self, array_shape.to_vec())
     }
 
     /// Returns the [`Chunks`] with `chunk_shape` in the array subset which can be iterated over.

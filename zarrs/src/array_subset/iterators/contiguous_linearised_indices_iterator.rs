@@ -3,7 +3,7 @@ use std::iter::FusedIterator;
 use crate::{
     array::ravel_indices,
     array_subset::ArraySubset,
-    indexer::IncompatibleIndexAndShapeError
+    indexer::{IncompatibleIndexAndShapeError, Indexer}
 };
 
 use super::{contiguous_indices_iterator::ContiguousIndices, ContiguousIndicesIterator};
@@ -31,19 +31,19 @@ use super::{contiguous_indices_iterator::ContiguousIndices, ContiguousIndicesIte
 /// [7, 10]
 /// ```
 /// with a `contiguous_elements{_usize}` of `2`.
-pub struct ContiguousLinearisedIndices {
-    inner: ContiguousIndices,
+pub struct ContiguousLinearisedIndices<I: Indexer> {
+    inner: ContiguousIndices<I>,
     array_shape: Vec<u64>,
 }
 
-impl ContiguousLinearisedIndices {
+impl <I: Indexer>ContiguousLinearisedIndices<I> {
     /// Return a new contiguous linearised indices iterator.
     ///
     /// # Errors
     ///
     /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
-        subset: &ArraySubset,
+        subset: &I,
         array_shape: Vec<u64>,
     ) -> Result<Self, IncompatibleIndexAndShapeError> {
         let inner = subset.contiguous_indices(&array_shape)?;
@@ -79,14 +79,14 @@ impl ContiguousLinearisedIndices {
 
     /// Create a new serial iterator.
     #[must_use]
-    pub fn iter(&self) -> ContiguousLinearisedIndicesIterator<'_> {
+    pub fn iter(&self) -> ContiguousLinearisedIndicesIterator<'_, I> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
 
-impl<'a> IntoIterator for &'a ContiguousLinearisedIndices {
+impl<'a, I:Indexer> IntoIterator for &'a ContiguousLinearisedIndices<I> {
     type Item = u64;
-    type IntoIter = ContiguousLinearisedIndicesIterator<'a>;
+    type IntoIter = ContiguousLinearisedIndicesIterator<'a, I>;
 
     fn into_iter(self) -> Self::IntoIter {
         ContiguousLinearisedIndicesIterator {
@@ -99,12 +99,12 @@ impl<'a> IntoIterator for &'a ContiguousLinearisedIndices {
 /// Serial contiguous linearised indices iterator.
 ///
 /// See [`ContiguousLinearisedIndices`].
-pub struct ContiguousLinearisedIndicesIterator<'a> {
-    inner: ContiguousIndicesIterator<'a>,
+pub struct ContiguousLinearisedIndicesIterator<'a, I:Indexer> {
+    inner: ContiguousIndicesIterator<'a, I>,
     array_shape: &'a [u64],
 }
 
-impl ContiguousLinearisedIndicesIterator<'_> {
+impl<I:Indexer>  ContiguousLinearisedIndicesIterator<'_, I> {
     /// Return the number of contiguous elements (fixed on each iteration).
     #[must_use]
     pub fn contiguous_elements(&self) -> u64 {
@@ -121,7 +121,7 @@ impl ContiguousLinearisedIndicesIterator<'_> {
     }
 }
 
-impl Iterator for ContiguousLinearisedIndicesIterator<'_> {
+impl<I:Indexer>  Iterator for ContiguousLinearisedIndicesIterator<'_, I> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -135,7 +135,7 @@ impl Iterator for ContiguousLinearisedIndicesIterator<'_> {
     }
 }
 
-impl DoubleEndedIterator for ContiguousLinearisedIndicesIterator<'_> {
+impl<I:Indexer> DoubleEndedIterator for ContiguousLinearisedIndicesIterator<'_, I> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner
             .next_back()
@@ -143,6 +143,6 @@ impl DoubleEndedIterator for ContiguousLinearisedIndicesIterator<'_> {
     }
 }
 
-impl ExactSizeIterator for ContiguousLinearisedIndicesIterator<'_> {}
+impl<I:Indexer> ExactSizeIterator for ContiguousLinearisedIndicesIterator<'_, I> {}
 
-impl FusedIterator for ContiguousLinearisedIndicesIterator<'_> {}
+impl<I:Indexer> FusedIterator for ContiguousLinearisedIndicesIterator<'_, I> {}

@@ -14,10 +14,7 @@ use crate::{
         concurrency::RecommendedConcurrency,
         ArrayBytes, ArrayBytesFixedDisjointView, BytesRepresentation, ChunkRepresentation,
         ChunkShape, RawBytes,
-    },
-    config::global_config,
-    metadata::v3::{MetadataConfiguration, MetadataV3},
-    plugin::PluginCreateError,
+    }, array_subset::ArraySubset, config::global_config, indexer::Indexer, metadata::v3::{MetadataConfiguration, MetadataV3}, plugin::PluginCreateError
 };
 
 #[cfg(feature = "async")]
@@ -383,7 +380,7 @@ impl ArrayToBytesCodecTraits for CodecChain {
         &self,
         mut bytes: RawBytes<'_>,
         decoded_representation: &ChunkRepresentation,
-        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>, // TODO: figure out dyn compat
         options: &CodecOptions,
     ) -> Result<(), CodecError> {
         let array_representations =

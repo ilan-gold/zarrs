@@ -15,14 +15,14 @@ use super::codec::{CodecError, InvalidBytesLengthError, SubsetOutOfBoundsError};
 /// A disjoint view of the bytes in an array with a fixed-length data type.
 ///
 /// The `subset` represented by this view must not overlap with the `subset` of any other created views that reference the same array bytes.
-pub struct ArrayBytesFixedDisjointView<'a> {
+pub struct ArrayBytesFixedDisjointView<'a, I: Indexer> {
     bytes: UnsafeCellSlice<'a, u8>,
     data_type_size: usize,
     shape: &'a [u64],
-    subset: ArraySubset,
+    subset: I,
     bytes_in_subset_len: usize,
-    contiguous_indices: ContiguousIndices,
-    contiguous_linearised_indices: ContiguousLinearisedIndices,
+    contiguous_indices: ContiguousIndices<I>,
+    contiguous_linearised_indices: ContiguousLinearisedIndices<I>,
 }
 
 /// Errors that can occur when creating a [`ArrayBytesFixedDisjointView`].
@@ -48,7 +48,7 @@ impl From<ArrayBytesFixedDisjointViewCreateError> for CodecError {
     }
 }
 
-impl<'a> ArrayBytesFixedDisjointView<'a> {
+impl<'a, I: Indexer> ArrayBytesFixedDisjointView<'a, I> {
     /// Create a new non-overlapping view of the bytes in an array.
     ///
     /// # Errors
@@ -65,11 +65,11 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
         bytes: UnsafeCellSlice<'a, u8>,
         data_type_size: usize,
         shape: &'a [u64],
-        subset: ArraySubset,
+        subset: I,
     ) -> Result<Self, ArrayBytesFixedDisjointViewCreateError> {
         if !subset.inbounds_shape(shape) {
             let bounding_subset = ArraySubset::new_with_shape(shape.to_vec());
-            return Err(SubsetOutOfBoundsError::new(subset, bounding_subset).into());
+            return Err(SubsetOutOfBoundsError::new(bounding_subset.clone(), bounding_subset).into()); // TODO: Generalize error
         }
         let bytes_in_array_len =
             usize::try_from(shape.iter().product::<u64>()).unwrap() * data_type_size;
@@ -98,14 +98,14 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     ///
     /// # Safety
     /// The `subset` represented by this view must not overlap with the `subset` of any other created views that reference the same array bytes.
-    pub unsafe fn subdivide(
+    pub unsafe fn subdivide<S: Indexer>(
         &self,
-        subset: ArraySubset,
-    ) -> Result<ArrayBytesFixedDisjointView<'a>, ArrayBytesFixedDisjointViewCreateError> {
+        subset: S,
+    ) -> Result<ArrayBytesFixedDisjointView<'_, S>, ArrayBytesFixedDisjointViewCreateError> {
         if !subset.inbounds(&self.subset) {
-            return Err(SubsetOutOfBoundsError::new(subset, self.subset.clone()).into());
+            return Err(SubsetOutOfBoundsError::new(ArraySubset::new_with_shape(subset.shape().to_vec()), ArraySubset::new_with_shape(subset.shape().to_vec())).into());  // TODO: Generalize error
         }
-        unsafe { Self::new(self.bytes, self.data_type_size, self.shape, subset) }
+        unsafe { ArrayBytesFixedDisjointView::new(self.bytes, self.data_type_size, self.shape, subset) }
     }
 
     /// Return the shape of the bytes this view is created from.
@@ -116,7 +116,7 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
 
     /// Return the subset of the bytes this view is created from.
     #[must_use]
-    pub fn subset(&self) -> &ArraySubset {
+    pub fn subset(&self) -> &I {
         &self.subset
     }
 
