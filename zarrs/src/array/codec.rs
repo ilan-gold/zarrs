@@ -440,7 +440,7 @@ pub trait ArrayPartialDecoderTraits: Any + Send + Sync {
     fn partial_decode_into(
         &self,
         array_subset: &ArraySubset,
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
         options: &CodecOptions,
     ) -> Result<(), CodecError> {
         if array_subset.num_elements() != output_view.num_elements() {
@@ -565,7 +565,7 @@ pub trait AsyncArrayPartialDecoderTraits: Any + Send + Sync {
     async fn partial_decode_into(
         &self,
         array_subset: &ArraySubset,
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
         options: &CodecOptions,
     ) -> Result<(), CodecError> {
         if array_subset.num_elements() != output_view.num_elements() {
@@ -935,7 +935,7 @@ pub trait ArrayToBytesCodecTraits: ArrayCodecTraits + core::fmt::Debug {
         &self,
         bytes: RawBytes<'_>,
         decoded_representation: &ChunkRepresentation,
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>, // TODO: somehow make this non-generic due to dyn compat
+        output_view: &mut ArrayBytesFixedDisjointView<'_>, // TODO: somehow make this non-generic due to dyn compat
         options: &CodecOptions,
     ) -> Result<(), CodecError> {
         if decoded_representation.num_elements() != output_view.num_elements() {

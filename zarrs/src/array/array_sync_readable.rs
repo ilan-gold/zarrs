@@ -472,7 +472,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> Array<TStorage> {
     fn retrieve_chunk_into(
         &self,
         chunk_indices: &[u64],
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
         options: &CodecOptions,
     ) -> Result<(), ArrayError> {
         if chunk_indices.len() != self.dimensionality() {
@@ -834,7 +834,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> Array<TStorage> {
         &self,
         chunk_indices: &[u64],
         chunk_subset: &ArraySubset,
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>, // TODO: dyn compat
+        output_view: &mut ArrayBytesFixedDisjointView<'_>, // TODO: dyn compat
         options: &CodecOptions,
     ) -> Result<(), ArrayError> {
         let chunk_representation = self.chunk_array_representation(chunk_indices)?;

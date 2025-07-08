@@ -331,7 +331,7 @@ impl ArrayToBytesCodecTraits for ShardingCodec {
         &self,
         encoded_shard: RawBytes<'_>,
         shard_representation: &ChunkRepresentation,
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>, // TODO: figure out dyn compat
+        output_view: &mut ArrayBytesFixedDisjointView<'_>, // TODO: figure out dyn compat
         options: &CodecOptions,
     ) -> Result<(), CodecError> {
         let chunk_representation = unsafe {

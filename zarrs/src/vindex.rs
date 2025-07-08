@@ -1,8 +1,11 @@
+use std::fmt::{Debug, Display};
+
 use crate::array::{ArrayIndices, ArrayShape};
 
 use crate::array_subset::iterators::{ContiguousIndices, ContiguousLinearisedIndices};
 use crate::array_subset::{ArraySubset, IncompatibleDimensionalityError};
-use crate::indexer::{IncompatibleIndexAndShapeError, Indexer};
+use crate::indexer::{IncompatibleIndexAndShapeError, Indexer, IndexerEnum};
+use crate::range_subset::RangeSubset;
 use itertools::{izip, Itertools};
 use derive_more::From;
 use thiserror::Error;
@@ -30,7 +33,17 @@ fn transpose(v: &Vec<Vec<u64>>) -> Vec<Vec<u64>>
         .collect()
 }
 
+impl Display for VIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.indices.fmt(f)
+    }
+}
+
 impl Indexer for VIndex {
+
+    fn to_enum(&self) -> IndexerEnum {
+        IndexerEnum::VIndex(self.clone())
+    }
 
     fn num_elements(&self) -> u64 {
         if self.are_dimension_first_indices {
@@ -60,9 +73,20 @@ impl Indexer for VIndex {
 
     fn end_exc(&self) -> ArrayIndices {
         if self.are_dimension_first_indices {
-            return self.indices.iter().map(|i| i[i.len() - 1]).collect::<Vec<_>>();
+            return self.indices.iter().map(|i| i[i.len() - 1] + 1).collect::<Vec<_>>();
         }
         self.indices[self.indices.len() - 1].clone()
+    }
+
+    fn end_inc(&self) -> Option<ArrayIndices> {
+        if self.is_empty() {
+            None
+        } else {
+            if self.are_dimension_first_indices {
+                return Some(self.indices.iter().map(|i| i[i.len() - 1]).collect::<Vec<_>>());
+            }
+            Some(self.indices[self.indices.len() - 1].clone())
+        }
     }
 
     fn start(&self) -> &[u64] {
@@ -97,24 +121,28 @@ impl Indexer for VIndex {
         self.indices.contains(&indices.to_vec())
     }
 
-    fn overlap_array_subset(&self, subset_other: &ArraySubset) -> Result<Self, IncompatibleDimensionalityError> {
-        if subset_other.dimensionality() == self.dimensionality() {
-            let indices: Vec<Vec<u64>>;
-            if self.are_dimension_first_indices{
-                indices = transpose(&self.indices).into_iter().filter(|row| izip!(row.iter(), subset_other.start(), subset_other.end_exc()).all(|(i, s, e)| i >= s && i < &e)).collect::<Vec<Vec<u64>>>();
+    fn overlap_array_subset(&self, subset_other: &ArraySubset) -> Result<IndexerEnum, IncompatibleDimensionalityError> {
+        if let IndexerEnum::RangeSubset(range_subset) = &subset_other.indexer {
+            if range_subset.dimensionality() == self.dimensionality() {
+                let indices: Vec<Vec<u64>>;
+                if self.are_dimension_first_indices{
+                    indices = transpose(&self.indices).into_iter().filter(|row| izip!(row.iter(), subset_other.start(), subset_other.end_exc()).all(|(i, s, e)| i >= s && i < &e)).collect::<Vec<Vec<u64>>>();
+                } else {
+                    indices = self.indices.clone();
+                }
+                return Ok(IndexerEnum::VIndex(Self::new_from_selection_first_indices(indices).unwrap())); // TODO: handle error better
             } else {
-                indices = self.indices.clone();
+                return Err(IncompatibleDimensionalityError::new(
+                    range_subset.dimensionality(),
+                    self.dimensionality(),
+                ));
             }
-            Ok(Self::new_from_selection_first_indices(indices).unwrap()) // TODO: handle error better
         } else {
-            Err(IncompatibleDimensionalityError::new(
-                subset_other.dimensionality(),
-                self.dimensionality(),
-            ))
+            todo!("Intersect other types or handle error more gracefully (ugh)")
         }
     }
 
-    fn relative_to(&self, start: &[u64]) -> Result<Self, IncompatibleDimensionalityError> {
+    fn relative_to(&self, start: &[u64]) -> Result<IndexerEnum, IncompatibleDimensionalityError> {
         if start.len() == self.dimensionality() {
             let iter: std::vec::IntoIter<Vec<u64>>;
             if self.are_dimension_first_indices {
@@ -124,12 +152,12 @@ impl Indexer for VIndex {
             }
             let indices = iter.filter(|row| row.iter().zip(start).all(|(i, s)| i >= s)).collect::<Vec<Vec<u64>>>();
             let shape = vec![indices[0].len() as u64];
-            Ok(Self {
+            Ok(IndexerEnum::VIndex(Self {
                 indices,
                 start: start.to_vec(),
                 shape,
                 are_dimension_first_indices: false
-            })
+            }))
             
         } else {
             Err(IncompatibleDimensionalityError::new(
@@ -141,7 +169,7 @@ impl Indexer for VIndex {
     fn contiguous_indices(
         &self,
         array_shape: &[u64],
-    ) -> Result<ContiguousIndices<Self>, IncompatibleIndexAndShapeError> {
+    ) -> Result<ContiguousIndices, IncompatibleIndexAndShapeError> {
         if !(self.dimensionality() == array_shape.len()
             && std::iter::zip(self.end_exc(), array_shape).all(|(end, shape)| end <= *shape))
         {
@@ -149,14 +177,14 @@ impl Indexer for VIndex {
                 array_shape.to_vec(),
             ));
         }
-        Ok(ContiguousIndices::new(self.clone(), 1))
+        Ok(ContiguousIndices::new(IndexerEnum::VIndex(self.clone()), 1))
     }
 
     fn contiguous_linearised_indices(
         &self,
         array_shape: &[u64],
-    ) -> Result<ContiguousLinearisedIndices<Self>, IncompatibleIndexAndShapeError> {
-        ContiguousLinearisedIndices::new(self, array_shape.to_vec())
+    ) -> Result<ContiguousLinearisedIndices, IncompatibleIndexAndShapeError> {
+        ContiguousLinearisedIndices::new(&IndexerEnum::VIndex(self.clone()), array_shape.to_vec())
     }
 }
 

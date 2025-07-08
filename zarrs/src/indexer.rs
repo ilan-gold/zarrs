@@ -1,11 +1,13 @@
 //! Indexer trait with common functionality
-use derive_more::From;
+use derive_more::{Display, From};
+use enum_dispatch::enum_dispatch;
 use itertools::izip;
+use serde_json::value::Index;
 use zarrs_metadata::ArrayShape;
 use zarrs_storage::byte_range::ByteRange;
 use thiserror::Error;
 
-use crate::{array::ArrayIndices, array_subset::{iterators::{ContiguousIndices, ContiguousLinearisedIndices, LinearisedIndices}, ArraySubset, IncompatibleDimensionalityError}};
+use crate::{array::ArrayIndices, range_subset::RangeSubset, array_subset::{iterators::{ContiguousIndices, ContiguousLinearisedIndices, LinearisedIndices}, ArraySubset, IncompatibleDimensionalityError}, vindex::VIndex};
 
 /// An incompatible array and array shape error.
 #[derive(Clone, Debug, Error, From)]
@@ -20,6 +22,7 @@ impl IncompatibleIndexAndShapeError {
     }
 }
 
+#[enum_dispatch]
 pub trait Indexer: Send + Sync + Clone {
     /// Return the number of elements of the array subset.
     ///
@@ -61,7 +64,7 @@ pub trait Indexer: Send + Sync + Clone {
     /// Get the `index`-th value along an `axis` i.e., for a range subset, `index` offset by the `axis` of [`start()`](Self::start())
     /// Returns true if this array subset is within the bounds of `subset`.
     #[must_use]
-    fn inbounds(&self, subset: &impl Indexer) -> bool {
+    fn inbounds(&self, subset: &ArraySubset) -> bool {
         if self.dimensionality() != subset.dimensionality() {
             return false;
         }
@@ -97,7 +100,9 @@ pub trait Indexer: Send + Sync + Clone {
         element_size: usize,
     ) -> Result<Vec<ByteRange>, IncompatibleIndexAndShapeError>;
 
-        /// Returns an iterator over the linearised indices of elements within the subset.
+    fn to_enum(&self) -> IndexerEnum;
+
+    /// Returns an iterator over the linearised indices of elements within the subset.
     ///
     /// # Errors
     ///
@@ -105,8 +110,8 @@ pub trait Indexer: Send + Sync + Clone {
     fn linearised_indices(
         &self,
         array_shape: &[u64],
-    ) -> Result<LinearisedIndices<Self>, IncompatibleIndexAndShapeError> {
-        LinearisedIndices::new(self.clone(), array_shape.to_vec())
+    ) -> Result<LinearisedIndices, IncompatibleIndexAndShapeError> {
+        LinearisedIndices::new(self.to_enum(), array_shape.to_vec())
     }
 
     /// Returns [`true`] if the array subset contains `indices`.
@@ -118,7 +123,7 @@ pub trait Indexer: Send + Sync + Clone {
     /// # Errors
     ///
     /// Returns [`IncompatibleDimensionalityError`] if the dimensionality of `subset_other` does not match the dimensionality of this array subset.
-    fn overlap_array_subset(&self, subset_other: &ArraySubset) -> Result<Self, IncompatibleDimensionalityError>;
+    fn overlap_array_subset(&self, subset_other: &ArraySubset) -> Result<IndexerEnum, IncompatibleDimensionalityError>;
     
     /// Return the subset relative to `start`.
     ///
@@ -126,7 +131,7 @@ pub trait Indexer: Send + Sync + Clone {
     ///
     /// # Errors
     /// Returns [`IncompatibleDimensionalityError`] if the length of `start` does not match the dimensionality of this array subset.
-    fn relative_to(&self, start: &[u64]) -> Result<Self, IncompatibleDimensionalityError>;
+    fn relative_to(&self, start: &[u64]) -> Result<IndexerEnum, IncompatibleDimensionalityError>;
 
         /// Returns an iterator over the indices of contiguous elements within the subset.
     ///
@@ -136,7 +141,7 @@ pub trait Indexer: Send + Sync + Clone {
     fn contiguous_indices(
         &self,
         array_shape: &[u64],
-    ) -> Result<ContiguousIndices<Self>, IncompatibleIndexAndShapeError>;
+    ) -> Result<ContiguousIndices, IncompatibleIndexAndShapeError>;
 
     /// Returns an iterator over the linearised indices of contiguous elements within the subset.
     ///
@@ -146,5 +151,37 @@ pub trait Indexer: Send + Sync + Clone {
     fn contiguous_linearised_indices(
         &self,
         array_shape: &[u64],
-    ) -> Result<ContiguousLinearisedIndices<Self>, IncompatibleIndexAndShapeError>;
+    ) -> Result<ContiguousLinearisedIndices, IncompatibleIndexAndShapeError>;
+
+
+    /// Return the shape of the array subset.
+    ///
+    /// # Panics
+    /// Panics if a dimension exceeds [`usize::MAX`].
+    #[must_use]
+    fn shape_usize(&self) -> Vec<usize> {
+        self.shape()
+            .iter()
+            .map(|d| usize::try_from(*d).unwrap())
+            .collect()
+    }
+
+    /// Returns if the array subset is empty (i.e. has a zero element in its shape).
+    #[must_use]
+    fn is_empty(&self) -> bool {
+        self.shape().iter().any(|i| i == &0)
+    }
+
+    fn end_inc(&self) -> Option<ArrayIndices>;
+}
+
+#[enum_dispatch(Indexer)]
+#[derive(Clone, Error, Debug, Eq, PartialEq, Display, PartialOrd, Ord, Hash)]
+pub enum IndexerEnum {
+    VIndex,
+    RangeSubset
+}
+
+impl Default for IndexerEnum {
+    fn default() -> Self { IndexerEnum::RangeSubset(Default::default()) }
 }

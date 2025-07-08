@@ -1,9 +1,11 @@
 use std::iter::FusedIterator;
 
+use serde_json::value::Index;
+
 use crate::{
     array::{ravel_indices, ArrayShape},
     array_subset::ArraySubset,
-    indexer::{Indexer, IncompatibleIndexAndShapeError},
+    indexer::{IncompatibleIndexAndShapeError, Indexer, IndexerEnum},
 };
 
 use super::IndicesIterator;
@@ -19,18 +21,18 @@ use super::IndicesIterator;
 /// 9  10  11
 /// ```
 /// An iterator with an array subset corresponding to the lower right 2x2 region will produce `[7, 8, 10, 11]`.
-pub struct LinearisedIndices<I: Indexer> {
-    subset: I,
+pub struct LinearisedIndices {
+    subset: IndexerEnum,
     array_shape: ArrayShape,
 }
 
-impl <I: Indexer>LinearisedIndices<I> {
+impl LinearisedIndices {
     /// Create a new linearised indices iterator.
     ///
     /// # Errors
     /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
-        subset: I,
+        subset: IndexerEnum,
         array_shape: ArrayShape,
     ) -> Result<Self, IncompatibleIndexAndShapeError> {
         if !subset.is_compatible_shape(&array_shape) {
@@ -48,7 +50,7 @@ impl <I: Indexer>LinearisedIndices<I> {
     /// # Safety
     /// `array_shape` must encapsulate `subset`.
     #[must_use]
-    pub unsafe fn new_unchecked(subset: I, array_shape: ArrayShape) -> Self {
+    pub unsafe fn new_unchecked(subset: IndexerEnum, array_shape: ArrayShape) -> Self {
         debug_assert_eq!(subset.dimensionality(), array_shape.len());
         debug_assert!(
             std::iter::zip(subset.end_exc(), &array_shape).all(|(end, shape)| end <= *shape)
@@ -73,14 +75,14 @@ impl <I: Indexer>LinearisedIndices<I> {
 
     /// Create a new serial iterator.
     #[must_use]
-    pub fn iter(&self) -> LinearisedIndicesIterator<'_, I> {
+    pub fn iter(&self) -> LinearisedIndicesIterator<'_> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
 
-impl<'a, I: Indexer> IntoIterator for &'a LinearisedIndices<I> {
+impl<'a> IntoIterator for &'a LinearisedIndices {
     type Item = u64;
-    type IntoIter = LinearisedIndicesIterator<'a, I>;
+    type IntoIter = LinearisedIndicesIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         LinearisedIndicesIterator {
@@ -93,12 +95,12 @@ impl<'a, I: Indexer> IntoIterator for &'a LinearisedIndices<I> {
 /// Serial linearised indices iterator.
 ///
 /// See [`LinearisedIndices`].
-pub struct LinearisedIndicesIterator<'a, I: Indexer> {
-    inner: IndicesIterator<'a, I>,
+pub struct LinearisedIndicesIterator<'a> {
+    inner: IndicesIterator<'a>,
     array_shape: &'a [u64],
 }
 
-impl <I: Indexer> Iterator for LinearisedIndicesIterator<'_, I> {
+impl  Iterator for LinearisedIndicesIterator<'_> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -112,7 +114,7 @@ impl <I: Indexer> Iterator for LinearisedIndicesIterator<'_, I> {
     }
 }
 
-impl  <I: Indexer>DoubleEndedIterator for LinearisedIndicesIterator<'_, I> {
+impl  DoubleEndedIterator for LinearisedIndicesIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner
             .next_back()
@@ -120,20 +122,20 @@ impl  <I: Indexer>DoubleEndedIterator for LinearisedIndicesIterator<'_, I> {
     }
 }
 
-impl <I: Indexer> ExactSizeIterator for LinearisedIndicesIterator<'_, I> {}
+impl  ExactSizeIterator for LinearisedIndicesIterator<'_> {}
 
-impl <I: Indexer> FusedIterator for LinearisedIndicesIterator<'_, I> {}
+impl  FusedIterator for LinearisedIndicesIterator<'_> {}
 
 #[cfg(test)]
 mod tests {
-    use crate::vindex::VIndex;
+    use crate::{range_subset::RangeSubset, vindex::VIndex};
 
     use super::*;
 
     #[test]
     fn linearised_indices_iterator_partial() {
         let indices =
-            LinearisedIndices::new(ArraySubset::new_with_ranges(&[1..3, 5..7]), vec![8, 8])
+            LinearisedIndices::new(IndexerEnum::RangeSubset(RangeSubset::new_with_ranges(&[1..3, 5..7])), vec![8, 8])
                 .unwrap();
         assert_eq!(indices.len(), 4);
         let mut iter = indices.iter();
@@ -148,7 +150,7 @@ mod tests {
     #[test]
     fn linearised_vindices_iterator_partial() {
         let indices =
-            LinearisedIndices::new(VIndex::new_from_dimension_first_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap(), vec![8, 8])
+            LinearisedIndices::new(IndexerEnum::VIndex(VIndex::new_from_dimension_first_indices(vec![vec![0, 1, 2, 5], vec![1, 0, 2, 5]]).unwrap()), vec![8, 8])
                 .unwrap();
         assert_eq!(indices.len(), 4);
         let mut iter = indices.iter();
@@ -162,7 +164,7 @@ mod tests {
     #[test]
     fn linearised_indices_iterator_oob() {
         assert!(
-            LinearisedIndices::new(ArraySubset::new_with_ranges(&[1..3, 5..7]), vec![1, 1])
+            LinearisedIndices::new(IndexerEnum::RangeSubset(RangeSubset::new_with_ranges(&[1..3, 5..7])), vec![1, 1])
                 .is_err()
         );
     }
@@ -170,7 +172,7 @@ mod tests {
     #[test]
     fn linearised_indices_iterator_empty() {
         let indices =
-            LinearisedIndices::new(ArraySubset::new_with_ranges(&[1..1, 5..5]), vec![5, 5])
+            LinearisedIndices::new(IndexerEnum::RangeSubset(RangeSubset::new_with_ranges(&[1..1, 5..5])), vec![5, 5])
                 .unwrap();
         assert_eq!(indices.len(), 0);
         assert!(indices.is_empty());

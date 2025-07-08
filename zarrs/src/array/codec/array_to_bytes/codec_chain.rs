@@ -380,7 +380,7 @@ impl ArrayToBytesCodecTraits for CodecChain {
         &self,
         mut bytes: RawBytes<'_>,
         decoded_representation: &ChunkRepresentation,
-        output_view: &mut ArrayBytesFixedDisjointView<'_, ArraySubset>, // TODO: figure out dyn compat
+        output_view: &mut ArrayBytesFixedDisjointView<'_>, // TODO: figure out dyn compat
         options: &CodecOptions,
     ) -> Result<(), CodecError> {
         let array_representations =

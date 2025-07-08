@@ -215,9 +215,9 @@ impl<'a> ArrayBytes<'a> {
     ///
     /// # Panics
     /// Panics if indices in the subset exceed [`usize::MAX`].
-    pub fn extract_array_subset<I: Indexer>(
+    pub fn extract_array_subset(
         &self,
-        subset: &I,
+        subset: &ArraySubset,
         array_shape: &[u64],
         data_type: &DataType,
     ) -> Result<ArrayBytes<'_>, CodecError> {
@@ -571,10 +571,10 @@ pub(crate) fn extract_decoded_regions_vlen<'a>(
 ///  - `data_type` and `fill_value` are compatible,
 ///  - `output` holds enough space for the preallocated bytes of an array with `output_shape` and `data_type`, and
 ///  - `output_subset` is within the bounds of `output_shape`.
-pub fn copy_fill_value_into<I: Indexer>(
+pub fn copy_fill_value_into(
     data_type: &DataType,
     fill_value: &FillValue,
-    output_view: &mut ArrayBytesFixedDisjointView<I>,
+    output_view: &mut ArrayBytesFixedDisjointView,
 ) -> Result<(), CodecError> {
     let array_size = ArraySize::new(data_type.size(), output_view.num_elements());
     if let ArrayBytes::Fixed(fill_value_bytes) = ArrayBytes::new_fill_value(array_size, fill_value)

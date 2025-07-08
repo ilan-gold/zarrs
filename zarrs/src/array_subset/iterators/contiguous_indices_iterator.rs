@@ -5,7 +5,7 @@ use itertools::izip;
 use crate::{
     array::ArrayIndices,
     array_subset::ArraySubset,
-    indexer::{Indexer, IncompatibleIndexAndShapeError},
+    indexer::{IncompatibleIndexAndShapeError, Indexer, IndexerEnum},
 };
 
 use super::IndicesIterator;
@@ -30,18 +30,18 @@ use super::IndicesIterator;
 /// ```rust,ignore
 /// [((2, 1), 2), ((3, 1), 2)]
 /// ```
-pub struct ContiguousIndices<I: Indexer> {
-    subset_contiguous_start: I,
+pub struct ContiguousIndices {
+    subset_contiguous_start: IndexerEnum,
     contiguous_elements: u64,
 }
 
-impl<I: Indexer> ContiguousIndices<I> {
+impl ContiguousIndices {
     /// Create a new contiguous indices iterator.
     ///
     /// # Errors
     /// Returns [`IncompatibleIndexAndShapeError`] if `array_shape` does not encapsulate `subset`.
     pub fn new(
-        subset_contiguous_start: I,
+        subset_contiguous_start: IndexerEnum,
         contiguous_elements: u64,
     ) -> Self {
         Self {
@@ -79,14 +79,14 @@ impl<I: Indexer> ContiguousIndices<I> {
 
     /// Create a new serial iterator.
     #[must_use]
-    pub fn iter(&self) -> ContiguousIndicesIterator<'_, I> {
+    pub fn iter(&self) -> ContiguousIndicesIterator<'_> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
 
-impl<'a, I: Indexer> IntoIterator for &'a ContiguousIndices<I> {
+impl<'a> IntoIterator for &'a ContiguousIndices {
     type Item = ArrayIndices;
-    type IntoIter = ContiguousIndicesIterator<'a, I>;
+    type IntoIter = ContiguousIndicesIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         ContiguousIndicesIterator {
@@ -99,12 +99,12 @@ impl<'a, I: Indexer> IntoIterator for &'a ContiguousIndices<I> {
 /// Serial contiguous indices iterator.
 ///
 /// See [`ContiguousIndices`].
-pub struct ContiguousIndicesIterator<'a, I: Indexer> {
-    inner: IndicesIterator<'a, I>,
+pub struct ContiguousIndicesIterator<'a> {
+    inner: IndicesIterator<'a>,
     contiguous_elements: u64,
 }
 
-impl<I: Indexer> ContiguousIndicesIterator<'_, I> {
+impl ContiguousIndicesIterator<'_> {
     /// Return the number of contiguous elements (fixed on each iteration).
     #[must_use]
     pub fn contiguous_elements(&self) -> u64 {
@@ -121,7 +121,7 @@ impl<I: Indexer> ContiguousIndicesIterator<'_, I> {
     }
 }
 
-impl<I: Indexer> Iterator for ContiguousIndicesIterator<'_, I> {
+impl Iterator for ContiguousIndicesIterator<'_> {
     type Item = ArrayIndices;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -133,12 +133,12 @@ impl<I: Indexer> Iterator for ContiguousIndicesIterator<'_, I> {
     }
 }
 
-impl<I: Indexer> DoubleEndedIterator for ContiguousIndicesIterator<'_, I> {
+impl DoubleEndedIterator for ContiguousIndicesIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner.next_back()
     }
 }
 
-impl <I: Indexer> ExactSizeIterator for ContiguousIndicesIterator<'_, I> {}
+impl ExactSizeIterator for ContiguousIndicesIterator<'_> {}
 
-impl <I: Indexer> FusedIterator for ContiguousIndicesIterator<'_, I> {}
+impl FusedIterator for ContiguousIndicesIterator<'_> {}

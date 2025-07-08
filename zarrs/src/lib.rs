@@ -200,6 +200,7 @@ pub mod indexer;
 pub mod node;
 pub mod version;
 pub mod vindex;
+pub mod range_subset;
 
 pub use zarrs_data_type as data_type;
 pub use zarrs_metadata as metadata;
