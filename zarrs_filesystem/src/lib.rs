@@ -7,6 +7,7 @@
 //! - the Apache License, Version 2.0 [LICENSE-APACHE](https://docs.rs/crate/zarrs_filesystem/latest/source/LICENCE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0> or
 //! - the MIT license [LICENSE-MIT](https://docs.rs/crate/zarrs_filesystem/latest/source/LICENCE-MIT) or <http://opensource.org/licenses/MIT>, at your option.
 
+use libc::option;
 use zarrs_storage::{
     byte_range::{ByteOffset, ByteRange, ByteRangeIterator},
     store_set_partial_values, Bytes, ListableStorageTraits, ReadableStorageTraits, StorageError,
@@ -20,11 +21,7 @@ use thiserror::Error;
 use walkdir::WalkDir;
 
 use std::{
-    collections::HashMap,
-    fs::{File, OpenOptions},
-    io::{Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    collections::HashMap, fs::{File, OpenOptions}, io::{self, Read, Seek, SeekFrom, Write}, os::{fd::{AsFd, AsRawFd}, unix::fs::MetadataExt}, path::{Path, PathBuf}, sync::{Arc, Mutex}
 };
 
 #[cfg(target_os = "linux")]
@@ -54,7 +51,7 @@ use std::os::unix::fs::OpenOptionsExt;
 // }
 
 /// For `O_DIRECT`, we need a buffer that is aligned to the page size and is a
-/// multiple of the page size.
+/// multiple of the page size.  The returned buffer size could be 0.
 fn bytes_aligned(size: usize) -> BytesMut {
     let align = page_size::get();
     let mut bytes = BytesMut::with_capacity(size + 2 * align);
@@ -257,8 +254,15 @@ impl ReadableStorageTraits for FilesystemStore {
     ) -> Result<Option<Vec<Bytes>>, StorageError> {
         let file = self.get_file_mutex(key);
         let _lock = file.read();
-
-        let mut file = match File::open(self.key_to_fspath(key)) {
+        let enable_direct =
+        cfg!(target_os = "linux") && self.options.direct_io;
+        let mut flags = OpenOptions::new();
+        flags.read(true);
+        #[cfg(target_os = "linux")]
+        if enable_direct {
+            flags.custom_flags(O_DIRECT);
+        }
+        let mut file = match flags.open(self.key_to_fspath(key)) {
             Ok(file) => file,
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::NotFound {
@@ -270,10 +274,45 @@ impl ReadableStorageTraits for FilesystemStore {
 
         let out = byte_ranges
             .map(|byte_range| {
-                let bytes = {
+                if enable_direct {
+                    let size = file.metadata().unwrap().size() as usize; // FIXME: unwrap
+                    let ps: usize = page_size::get();
+                    let (offset, length) = match byte_range {
+                        ByteRange::FromStart(offset, option_length) => {
+                            match option_length {
+                                Some(length) => (offset as usize, length as usize),
+                                None => (offset as usize, size - offset as usize)
+                            }
+                        },
+                        ByteRange::Suffix(offset) => (size - offset as usize, offset as usize)
+                    };
+                    if length > size {
+                        return Err(StorageError::IOError(Arc::new(io::Error::new(io::ErrorKind::UnexpectedEof, "TODO: To make test pass and match the behavior in the non-direct_io case, requesting length > file size is not permitted"))));
+                    }
+                    let fd = file.as_raw_fd();
+                    
+                    let mut buf_ptr: *mut u8 = std::ptr::null_mut();
+                    let ret = unsafe { libc::posix_memalign(&mut buf_ptr as *mut *mut u8 as *mut _, ps, if length < ps { ps } else { length.next_multiple_of(ps) }) };
+                    if ret != 0 {
+                        panic!("posix_memalign failed");
+                    }
+                    let buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr, ps) };
+                    let aligned_offset = offset - (offset % ps);
+                    let read_bytes = unsafe { libc::pread(fd, buf_ptr as *mut _, ps, aligned_offset as i64) };
+                    if read_bytes < 0 {
+                        panic!("pread failed");
+                    }
+
+                    let start_in_buf = (offset - aligned_offset) as usize;
+
+                    let last_bytes = &buf[start_in_buf..(start_in_buf + length)];
+                    Ok(Bytes::from(last_bytes.to_vec()))
+                } else {
                     // Seek
                     match byte_range {
-                        ByteRange::FromStart(offset, _) => file.seek(SeekFrom::Start(offset)),
+                        ByteRange::FromStart(offset, _) => {
+                            file.seek(SeekFrom::Start(offset))
+                        }, 
                         ByteRange::Suffix(length) => {
                             file.seek(SeekFrom::End(-(i64::try_from(length).unwrap())))
                         }
@@ -284,17 +323,17 @@ impl ReadableStorageTraits for FilesystemStore {
                         ByteRange::FromStart(_, None) => {
                             let mut buffer = Vec::new();
                             file.read_to_end(&mut buffer)?;
-                            buffer
+                            Ok(Bytes::from(buffer))
+    
                         }
                         ByteRange::FromStart(_, Some(length)) | ByteRange::Suffix(length) => {
                             let length = usize::try_from(length).unwrap();
                             let mut buffer = vec![0; length];
                             file.read_exact(&mut buffer)?;
-                            buffer
+                            Ok(Bytes::from(buffer))
                         }
                     }
-                };
-                Ok(Bytes::from(bytes))
+                }
             })
             .collect::<Result<Vec<Bytes>, StorageError>>()?;
 
