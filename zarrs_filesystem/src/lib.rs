@@ -290,15 +290,15 @@ impl ReadableStorageTraits for FilesystemStore {
                         return Err(StorageError::IOError(Arc::new(io::Error::new(io::ErrorKind::UnexpectedEof, "TODO: To make test pass and match the behavior in the non-direct_io case, requesting length > file size is not permitted"))));
                     }
                     let fd = file.as_raw_fd();
-                    
+                    let buf_len = if length < ps { ps } else { length.next_multiple_of(ps) };
                     let mut buf_ptr: *mut u8 = std::ptr::null_mut();
-                    let ret = unsafe { libc::posix_memalign(&mut buf_ptr as *mut *mut u8 as *mut _, ps, if length < ps { ps } else { length.next_multiple_of(ps) }) };
+                    let ret = unsafe { libc::posix_memalign(&mut buf_ptr as *mut *mut u8 as *mut _, ps,  buf_len) };
                     if ret != 0 {
                         panic!("posix_memalign failed");
                     }
-                    let buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr, ps) };
+                    let buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr, buf_len) };
                     let aligned_offset = offset - (offset % ps);
-                    let read_bytes = unsafe { libc::pread(fd, buf_ptr as *mut _, ps, aligned_offset as i64) };
+                    let read_bytes = unsafe { libc::pread(fd, buf_ptr as *mut _, buf_len, aligned_offset as i64) };
                     if read_bytes < 0 {
                         panic!("pread failed");
                     }
