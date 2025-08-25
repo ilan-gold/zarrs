@@ -37,6 +37,7 @@ fn filesystem() -> Result<(), Box<dyn Error>> {
 // #[cfg_attr(miri, ignore)]
 fn direct_io() -> Result<(), Box<dyn Error>> {
     use zarrs_filesystem::FilesystemStoreOptions;
+    use zarrs_storage::{byte_range::ByteRange, Bytes, ReadableStorageTraits, WritableStorageTraits};
 
     let tmpfile = tempfile::NamedTempFile::new()?;
     if try_open_direct_io(tmpfile.path().to_str().unwrap()).is_err() {
@@ -52,5 +53,15 @@ fn direct_io() -> Result<(), Box<dyn Error>> {
     zarrs_storage::store_test::store_write(&store)?;
     zarrs_storage::store_test::store_read(&store)?;
     zarrs_storage::store_test::store_list(&store)?;
+
+    // Test out fetching different kinds of non-page aligned reads against a larger file.
+    let ps = page_size::get();
+    let base_vec: Bytes = (0..ps + 15).map(|i| (i % 256) as u8).collect::<Vec<u8>>().into();
+    let prefix: Bytes = base_vec.get(1..11).unwrap().to_owned().into();
+    let suffix: Bytes = base_vec.get(ps+5..).unwrap().to_owned().into();
+    let chunk: Bytes = base_vec.get(1..ps+3).unwrap().to_owned().into();
+
+    store.set(&"big_buff".try_into()?, base_vec.into())?;
+    assert_eq!(vec![prefix, suffix, chunk], store.get_partial_values_key(&"big_buff".try_into()?,  &mut [ByteRange::FromStart(1, Some(10)), ByteRange::Suffix(10), ByteRange::FromStart(1, Some((ps + 2) as u64))].into_iter()).unwrap().unwrap());
     Ok(())
 }
