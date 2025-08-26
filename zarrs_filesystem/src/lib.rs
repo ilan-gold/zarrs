@@ -291,7 +291,9 @@ impl ReadableStorageTraits for FilesystemStore {
                     }
                     let fd = file.as_raw_fd();
                     let aligned_offset = offset - (offset % ps);
-                    let buf_len = if length < ps { ps } else { length.next_multiple_of(ps) + ps };
+                    // If the requested length is less than the page size, the aligned seek from above could in theory still add on an extra page to the buffer needed to read in the data aligned.
+                    // So offset % ps represents the starting point in the buffer where the requested data is - if that point plus length runs over ps, we need another ps worth of data.
+                    let buf_len = if length < ps { ((offset % ps) + length).next_multiple_of(ps) } else { length.next_multiple_of(ps) + ps };
                     let mut buf_ptr: *mut u8 = std::ptr::null_mut();
                     let ret = unsafe { libc::posix_memalign(&mut buf_ptr as *mut *mut u8 as *mut _, ps,  buf_len) };
                     if ret != 0 {
