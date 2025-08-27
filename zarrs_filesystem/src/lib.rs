@@ -314,10 +314,9 @@ impl ReadableStorageTraits for FilesystemStore {
 
                     let start_in_buf = offset - aligned_offset;
                     // SAFETY: buf_ptr is not null as a result of posix_memalign, valid for u8 * buf_len bytes reads since it was filled via `pread` with said length, and is properly aligned.
-                    let mut v = unsafe { Vec::from_raw_parts(buf_ptr as *mut u8, buf_len, buf_len) };
-                    v.drain(0..start_in_buf);
-                    v.truncate(length);
-                    return Ok(Bytes::from(v));
+                    let mut bytes_vec = unsafe { Vec::from_raw_parts(buf_ptr.cast::<u8>(), start_in_buf + length, buf_len) };
+                    bytes_vec.drain(0..start_in_buf);
+                    return Ok(Bytes::from(bytes_vec));
                 }
                 // Seek
                 match byte_range {
