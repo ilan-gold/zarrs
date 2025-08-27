@@ -309,15 +309,15 @@ impl ReadableStorageTraits for FilesystemStore {
                     let mut buf_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
                     let ret = unsafe { libc::posix_memalign(&mut buf_ptr, ps,  buf_len) };
                     assert!(ret == 0, "posix_memalign failed during O_DIRECT reading");
-                    let buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr.cast::<u8>(), buf_len) };
                     let read_bytes = unsafe { libc::pread(fd, buf_ptr, buf_len, i64::try_from(aligned_offset).unwrap()) };
                     assert!(read_bytes >= 0, "pread failed during O_DIRECT reading");
 
                     let start_in_buf = offset - aligned_offset;
-                    let last_bytes = buf[start_in_buf..(start_in_buf + length)].to_vec();
-                    // Free the unused memory
-                    unsafe { libc::free(buf_ptr) };
-                    return Ok(Bytes::from(last_bytes));
+                    // SAFETY: buf_ptr is not null as a result of posix_memalign, valid for u8 * buf_len bytes reads since it was filled via `pread` with said length, and is properly aligned.
+                    let mut v = unsafe { Vec::from_raw_parts(buf_ptr as *mut u8, buf_len, buf_len) };
+                    v.drain(0..start_in_buf);
+                    v.truncate(length);
+                    return Ok(Bytes::from(v));
                 }
                 // Seek
                 match byte_range {
