@@ -12,8 +12,7 @@ use crate::array::{
     codec::{
         BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
         RecommendedConcurrency,
-    },
-    BytesRepresentation, RawBytes,
+    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
 };
 
 use super::{Bz2CodecConfiguration, Bz2CodecConfigurationV1, Bz2CompressionLevel};
@@ -109,6 +108,18 @@ impl BytesToBytesCodecTraits for Bz2Codec {
         let mut out: Vec<u8> = Vec::new();
         decoder.read_to_end(&mut out)?;
         Ok(Cow::Owned(out))
+    }
+
+    fn decode_into<'a>(
+        &self,
+        bytes: RawBytes<'a>,
+        _decoded_representation: &BytesRepresentation,
+        _options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError> {
+        let mut decoder = bzip2::read::BzDecoder::new(Cursor::new(bytes));
+        decoder.read(output_view.get_contiguous_slice()?)?;
+        Ok(())
     }
 
     fn encoded_representation(

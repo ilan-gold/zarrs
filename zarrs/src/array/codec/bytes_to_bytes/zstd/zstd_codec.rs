@@ -9,8 +9,7 @@ use crate::array::{
     codec::{
         BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
         RecommendedConcurrency,
-    },
-    BytesRepresentation, RawBytes,
+    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
 };
 
 use super::{ZstdCodecConfiguration, ZstdCodecConfigurationV1};
@@ -126,6 +125,20 @@ impl BytesToBytesCodecTraits for ZstdCodec {
                 .map_err(CodecError::from)
                 .map(Cow::Owned)
         }
+    }
+
+    fn decode_into<'a>(
+        &self,
+        bytes: RawBytes<'a>,
+        _decoded_representation: &BytesRepresentation,
+        _options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError> {
+        let nbytes = zstd::bulk::decompress_to_buffer(&bytes, output_view.get_contiguous_slice()?)?;
+        if nbytes != bytes.len() {
+            return Err(crate::array::codec::InvalidBytesLengthError::new(nbytes, bytes.len()).into());
+        }
+        Ok(())
     }
 
     fn encoded_representation(

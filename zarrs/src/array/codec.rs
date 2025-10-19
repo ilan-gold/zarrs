@@ -1092,6 +1092,18 @@ pub trait BytesToBytesCodecTraits: CodecTraits + core::fmt::Debug {
         options: &CodecOptions,
     ) -> Result<RawBytes<'a>, CodecError>;
 
+    /// Decode a chunk into a contiguous output.
+    ///
+    /// # Errors
+    /// Returns [`CodecError`] if a codec fails or the decoded output is incompatible with `decoded_representation`.
+    fn decode_into<'a>(
+        &self,
+        bytes: RawBytes<'a>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError>;
+
     /// Initialises a partial decoder.
     ///
     /// The default implementation decodes the entire chunk.

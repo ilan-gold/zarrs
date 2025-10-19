@@ -8,8 +8,7 @@ use crate::array::{
     codec::{
         BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
         RecommendedConcurrency,
-    },
-    BytesRepresentation, RawBytes,
+    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
 };
 
 use super::{ShuffleCodecConfiguration, ShuffleCodecConfigurationV1};
@@ -132,6 +131,29 @@ impl BytesToBytesCodecTraits for ShuffleCodec {
             }
         }
         Ok(Cow::Owned(decoded_value))
+    }
+
+    fn decode_into<'a>(
+        &self,
+        bytes: RawBytes<'a>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError> {
+        if !is_multiple_of(bytes.len(), self.elementsize) {
+            return Err(CodecError::Other("the shuffle codec expects the input byte length to be an integer multiple of the elementsize".to_string()));
+        }
+
+        let decoded_value = output_view.get_contiguous_slice()?;
+        let count = decoded_value.len().div_ceil(self.elementsize);
+        for i in 0..self.elementsize {
+            let offset = i * count;
+            for byte_index in 0..count {
+                let j = byte_index * self.elementsize + i;
+                decoded_value[j] = bytes[offset + byte_index];
+            }
+        }
+        Ok(())
     }
 
     fn encoded_representation(

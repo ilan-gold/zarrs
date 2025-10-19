@@ -9,8 +9,7 @@ use crate::{
         codec::{
             BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
             CodecOptions, CodecTraits, RecommendedConcurrency,
-        },
-        BytesRepresentation, RawBytes,
+        }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
     },
     plugin::PluginCreateError,
 };
@@ -139,6 +138,10 @@ impl BloscCodec {
             },
         )
     }
+
+    fn do_decode_into<'a>(encoded_value: &[u8], n_threads: usize, out: &'a mut [u8]) -> Result<(), CodecError> {
+        todo!("rewrite `blosc_decompress_bytes` to take an output buffer")
+    }
 }
 
 impl CodecTraits for BloscCodec {
@@ -217,6 +220,17 @@ impl BytesToBytesCodecTraits for BloscCodec {
         // .get();
         let n_threads = 1;
         Ok(Cow::Owned(Self::do_decode(&encoded_value, n_threads)?))
+    }
+
+    fn decode_into<'a>(
+        &self,
+        bytes: RawBytes<'a>,
+        _decoded_representation: &BytesRepresentation,
+        _options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError> {
+        let n_threads = 1;
+        Self::do_decode_into(&bytes, n_threads, output_view.get_contiguous_slice()?)
     }
 
     fn partial_decoder(

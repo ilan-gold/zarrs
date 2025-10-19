@@ -9,8 +9,7 @@ use crate::array::{
         bytes_to_bytes::strip_suffix_partial_decoder::StripSuffixPartialDecoder,
         BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
         CodecOptions, CodecTraits, RecommendedConcurrency,
-    },
-    BytesRepresentation, RawBytes,
+    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
 };
 
 #[cfg(feature = "async")]
@@ -143,6 +142,31 @@ impl BytesToBytesCodecTraits for Fletcher32Codec {
         } else {
             Err(CodecError::Other(
                 "fletcher32 decoder expects a 32 bit input".to_string(),
+            ))
+        }
+    }
+
+
+    fn decode_into<'a>(
+        &self,
+        bytes: RawBytes<'a>,
+        _decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError> {
+                if bytes.len() >= CHECKSUM_SIZE {
+            if options.validate_checksums() {
+                let decoded_value = &bytes[..bytes.len() - CHECKSUM_SIZE];
+                let checksum = h5_checksum_fletcher32(decoded_value).to_le_bytes();
+                if checksum != bytes[bytes.len() - CHECKSUM_SIZE..] {
+                    return Err(CodecError::InvalidChecksum);
+                }
+            }
+            output_view.copy_from_slice(&bytes[..bytes.len() - CHECKSUM_SIZE])?;
+            Ok(())
+        } else {
+            Err(CodecError::Other(
+                "crc32c decoder expects a 32 bit input".to_string(),
             ))
         }
     }
