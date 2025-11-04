@@ -591,6 +591,7 @@ mod direct_io {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod tests {
     use super::direct_io::*;
     use zarrs_storage::byte_range::ByteRange;

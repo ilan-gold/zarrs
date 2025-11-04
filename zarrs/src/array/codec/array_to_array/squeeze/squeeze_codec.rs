@@ -56,12 +56,6 @@ impl SqueezeCodec {
     }
 }
 
-impl Default for SqueezeCodec {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CodecTraits for SqueezeCodec {
     fn identifier(&self) -> &str {
         SQUEEZE
