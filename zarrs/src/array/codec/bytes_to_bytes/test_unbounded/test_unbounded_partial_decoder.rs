@@ -1,11 +1,13 @@
 use std::{borrow::Cow, sync::Arc};
 
+use zarrs_storage::StorageError;
+
 use crate::{
     array::{
         codec::{BytesPartialDecoderTraits, CodecError, CodecOptions},
         RawBytes,
     },
-    byte_range::{extract_byte_ranges, ByteRange},
+    storage::byte_range::{extract_byte_ranges, ByteRangeIterator},
 };
 
 #[cfg(feature = "async")]
@@ -24,13 +26,17 @@ impl TestUnboundedPartialDecoder {
 }
 
 impl BytesPartialDecoderTraits for TestUnboundedPartialDecoder {
-    fn size(&self) -> usize {
-        self.input_handle.size()
+    fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists()
     }
 
-    fn partial_decode(
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    fn partial_decode_many(
         &self,
-        decoded_regions: &[ByteRange],
+        decoded_regions: ByteRangeIterator,
         options: &CodecOptions,
     ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
         let encoded_value = self.input_handle.decode(options)?;
@@ -45,6 +51,10 @@ impl BytesPartialDecoderTraits for TestUnboundedPartialDecoder {
                 .map(Cow::Owned)
                 .collect(),
         ))
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        false
     }
 }
 
@@ -63,11 +73,20 @@ impl AsyncTestUnboundedPartialDecoder {
 }
 
 #[cfg(feature = "async")]
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl AsyncBytesPartialDecoderTraits for AsyncTestUnboundedPartialDecoder {
-    async fn partial_decode(
-        &self,
-        decoded_regions: &[ByteRange],
+    async fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists().await
+    }
+
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    async fn partial_decode_many<'a>(
+        &'a self,
+        decoded_regions: ByteRangeIterator<'a>,
         options: &CodecOptions,
     ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
         let encoded_value = self.input_handle.decode(options).await?;
@@ -82,5 +101,9 @@ impl AsyncBytesPartialDecoderTraits for AsyncTestUnboundedPartialDecoder {
                 .map(Cow::Owned)
                 .collect(),
         ))
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        false
     }
 }

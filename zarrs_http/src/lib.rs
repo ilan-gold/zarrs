@@ -15,10 +15,11 @@
 //! - the MIT license [LICENSE-MIT](https://docs.rs/crate/zarrs_http/latest/source/LICENCE-MIT) or <http://opensource.org/licenses/MIT>, at your option.
 
 use zarrs_storage::{
-    byte_range::ByteRange, Bytes, MaybeBytes, ReadableStorageTraits, StorageError, StoreKey,
+    byte_range::ByteRangeIterator, MaybeBytes, MaybeBytesIterator, ReadableStorageTraits,
+    StorageError, StoreKey,
 };
 
-use itertools::Itertools;
+use itertools::multiunzip;
 use reqwest::{
     header::{HeaderValue, CONTENT_LENGTH, RANGE},
     StatusCode, Url,
@@ -98,19 +99,30 @@ impl ReadableStorageTraits for HTTPStore {
         }
     }
 
-    fn get_partial_values_key(
-        &self,
+    fn get_partial_many<'a>(
+        &'a self,
         key: &StoreKey,
-        byte_ranges: &[ByteRange],
-    ) -> Result<Option<Vec<Bytes>>, StorageError> {
+        byte_ranges: ByteRangeIterator<'a>,
+    ) -> Result<MaybeBytesIterator<'a>, StorageError> {
         let url = self.key_to_url(key).map_err(handle_url_error)?;
         let Some(size) = self.size_key(key)? else {
             return Ok(None);
         };
-        let bytes_strs = byte_ranges
-            .iter()
-            .map(|byte_range| format!("{}-{}", byte_range.start(size), byte_range.end(size) - 1))
-            .join(", ");
+        let (bytes_strs, bytes_lengths, bytes_start_end): (
+            Vec<String>,
+            Vec<usize>,
+            Vec<(usize, usize)>,
+        ) = multiunzip(byte_ranges.map(|byte_range| {
+            (
+                format!("{}-{}", byte_range.start(size), byte_range.end(size) - 1),
+                usize::try_from(byte_range.length(size)).unwrap(),
+                (
+                    usize::try_from(byte_range.start(size)).unwrap(),
+                    usize::try_from(byte_range.end(size)).unwrap(),
+                ),
+            )
+        }));
+        let bytes_strs = bytes_strs.join(", ");
 
         let range = HeaderValue::from_str(&format!("bytes={bytes_strs}")).unwrap();
         let response = self
@@ -126,18 +138,12 @@ impl ReadableStorageTraits for HTTPStore {
                 // TODO: Gracefully handle a response from the server which does not include all requested by ranges
                 let mut bytes = response.bytes().map_err(handle_reqwest_error)?;
                 if bytes.len() as u64
-                    == byte_ranges
+                    == bytes_lengths
                         .iter()
-                        .map(|byte_range| byte_range.length(size))
-                        .sum::<u64>()
+                        .sum::<usize>() as u64
                 {
-                    let mut out = Vec::with_capacity(byte_ranges.len());
-                    for byte_range in byte_ranges {
-                        let bytes_range =
-                            bytes.split_to(usize::try_from(byte_range.length(size)).unwrap());
-                        out.push(bytes_range);
-                    }
-                    Ok(Some(out))
+                    let bytes = bytes_lengths.into_iter().map(move |length| Ok(bytes.split_to(length)));
+                    Ok(Some(Box::new(bytes)))
                 } else {
                     Err(StorageError::from(
                         "http partial content response did not include all requested byte ranges",
@@ -147,13 +153,10 @@ impl ReadableStorageTraits for HTTPStore {
             StatusCode::OK => {
                 // Received all bytes
                 let bytes = response.bytes().map_err(handle_reqwest_error)?;
-                let mut out = Vec::with_capacity(byte_ranges.len());
-                for byte_range in byte_ranges {
-                    let start = usize::try_from(byte_range.start(size)).unwrap();
-                    let end = usize::try_from(byte_range.end(size)).unwrap();
-                    out.push(bytes.slice(start..end));
-                }
-                Ok(Some(out))
+                let bytes = bytes_start_end.into_iter().map(move |(start, end)| {
+                    Ok(bytes.slice(start..end))
+                });
+                Ok(Some(Box::new(bytes)))
             }
             _ => Err(StorageError::from(format!(
                 "the http server responded with status {} for the byte range request",
@@ -182,6 +185,11 @@ impl ReadableStorageTraits for HTTPStore {
             ))),
         }
     }
+
+    fn supports_get_partial(&self) -> bool {
+        true // NOTE: Not all HTTP servers support range requests, but optimistically assume so here.
+             // FIXME: Do a capability check on init?
+    }
 }
 
 /// A HTTP store creation error.
@@ -199,6 +207,7 @@ pub enum HTTPStoreCreateError {
 mod tests {
     use super::*;
     use std::error::Error;
+    use zarrs_storage::byte_range::ByteRange;
 
     const HTTP_TEST_PATH_REF: &str =
         "https://raw.githubusercontent.com/zarrs/zarrs/main/zarrs/tests/data/store";
@@ -228,9 +237,9 @@ mod tests {
         let store = HTTPStore::new("https://raw.githubusercontent.com/bad").unwrap();
         assert!(store.get(&"zarr.json".try_into().unwrap()).is_err());
         assert!(store
-            .get_partial_values_key(
+            .get_partial(
                 &"zarr.json".try_into().unwrap(),
-                &[ByteRange::FromStart(0, None)]
+                ByteRange::FromStart(0, None)
             )
             .is_err());
         assert!(store.size_key(&"zarr.json".try_into().unwrap()).is_err());

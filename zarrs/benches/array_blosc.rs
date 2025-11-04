@@ -1,3 +1,4 @@
+//! Benchmark the `blosc` codec in various configurations.
 #![allow(missing_docs)]
 
 use std::sync::Arc;
@@ -16,8 +17,8 @@ fn array_blosc_write_all(c: &mut Criterion) {
                 let store = zarrs::storage::store::MemoryStore::new();
                 let array = zarrs::array::ArrayBuilder::new(
                     vec![size; 3],
-                    zarrs::array::DataType::UInt8,
                     vec![32; 3],
+                    zarrs::array::DataType::UInt8,
                     0u8,
                 )
                 .bytes_to_bytes_codecs(vec![Arc::new(
@@ -51,8 +52,8 @@ fn array_blosc_read_all(c: &mut Criterion) {
             let store = zarrs::storage::store::MemoryStore::new();
             let array = zarrs::array::ArrayBuilder::new(
                 vec![size; 3],
-                zarrs::array::DataType::UInt8,
                 vec![32; 3],
+                zarrs::array::DataType::UInt8,
                 0u8,
             )
             .bytes_to_bytes_codecs(vec![Arc::new(

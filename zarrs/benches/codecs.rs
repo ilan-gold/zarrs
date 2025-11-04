@@ -1,3 +1,6 @@
+//! Benchmark various codecs.
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 
 use criterion::{

@@ -27,11 +27,12 @@
 //! ```
 
 mod transpose_codec;
-mod transpose_partial_decoder;
+mod transpose_codec_partial;
 
 use std::sync::Arc;
 
 pub use transpose_codec::TransposeCodec;
+use zarrs_metadata::DataTypeSize;
 pub use zarrs_metadata_ext::codec::transpose::{
     TransposeCodecConfiguration, TransposeCodecConfigurationV1, TransposeOrder, TransposeOrderError,
 };
@@ -40,9 +41,11 @@ use zarrs_registry::codec::TRANSPOSE;
 use crate::{
     array::{
         array_bytes::RawBytesOffsets,
-        codec::{Codec, CodecPlugin},
+        codec::{Codec, CodecError, CodecPlugin},
         ArrayBytes, RawBytes,
     },
+    array_subset::ArraySubset,
+    indexer::{IncompatibleIndexerError, Indexer},
     metadata::v3::MetadataV3,
     plugin::{PluginCreateError, PluginMetadataInvalidError},
 };
@@ -109,12 +112,16 @@ fn transpose_array(
     }
 }
 
-fn permute<T: Copy>(v: &[T], order: &[usize]) -> Vec<T> {
-    let mut vec = Vec::<T>::with_capacity(v.len());
-    for axis in order {
-        vec.push(v[*axis]);
+fn permute<T: Copy>(v: &[T], order: &[usize]) -> Option<Vec<T>> {
+    if v.len() == order.len() {
+        let mut vec = Vec::<T>::with_capacity(v.len());
+        for axis in order {
+            vec.push(v[*axis]);
+        }
+        Some(vec)
+    } else {
+        None
     }
-    vec
 }
 
 fn transpose_vlen<'a>(
@@ -149,6 +156,87 @@ fn transpose_vlen<'a>(
         ArrayBytes::new_vlen_unchecked(bytes_new, offsets_new)
     };
     array_bytes
+}
+
+fn get_transposed_array_subset(
+    order: &TransposeOrder,
+    decoded_region: &ArraySubset,
+) -> Result<ArraySubset, CodecError> {
+    if decoded_region.dimensionality() != order.0.len() {
+        return Err(IncompatibleIndexerError::new_incompatible_dimensionality(
+            decoded_region.dimensionality(),
+            order.0.len(),
+        )
+        .into());
+    }
+
+    let start = permute(decoded_region.start(), &order.0).expect("matching dimensionality");
+    let size = permute(decoded_region.shape(), &order.0).expect("matching dimensionality");
+    let ranges = start.iter().zip(size).map(|(&st, si)| st..(st + si));
+    Ok(ArraySubset::from(ranges))
+}
+
+fn get_transposed_indexer(
+    order: &TransposeOrder,
+    indexer: &dyn Indexer,
+) -> Result<impl Indexer, CodecError> {
+    indexer
+        .iter_indices()
+        .map(|indices| permute(&indices, &order.0))
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| {
+            IncompatibleIndexerError::new_incompatible_dimensionality(
+                indexer.dimensionality(),
+                order.0.len(),
+            )
+            .into()
+        })
+}
+
+/// Reverse the transpose on each subset
+fn do_transpose<'a>(
+    encoded_value: &ArrayBytes<'a>,
+    subset: &ArraySubset,
+    order: &TransposeOrder,
+    data_type_size: DataTypeSize,
+) -> Result<ArrayBytes<'a>, CodecError> {
+    if subset.dimensionality() != order.0.len() {
+        return Err(IncompatibleIndexerError::new_incompatible_dimensionality(
+            subset.dimensionality(),
+            order.0.len(),
+        )
+        .into());
+    }
+
+    let order_decode = calculate_order_decode(order, subset.dimensionality());
+    encoded_value.validate(subset.num_elements(), data_type_size)?;
+    match (encoded_value, data_type_size) {
+        (ArrayBytes::Variable(bytes, offsets), DataTypeSize::Variable) => {
+            let mut order_decode = vec![0; subset.dimensionality()];
+            for (i, val) in order.0.iter().enumerate() {
+                order_decode[*val] = i;
+            }
+            Ok(transpose_vlen(
+                bytes,
+                offsets,
+                &subset.shape_usize(),
+                order_decode,
+            ))
+        }
+        (ArrayBytes::Fixed(bytes), DataTypeSize::Fixed(data_type_size)) => {
+            let bytes = transpose_array(
+                &order_decode,
+                &permute(subset.shape(), &order.0).expect("matching dimensionality"),
+                data_type_size,
+                bytes,
+            )
+            .map_err(|_| CodecError::Other("transpose_array error".to_string()))?;
+            Ok(ArrayBytes::from(bytes))
+        }
+        (_, _) => Err(CodecError::Other(
+            "dev error: transpose data type mismatch".to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -245,12 +333,7 @@ mod tests {
         let encoded = codec
             .encode(bytes, &chunk_representation, &CodecOptions::default())
             .unwrap();
-        let decoded_regions = [
-            ArraySubset::new_with_ranges(&[0..4, 0..4]),
-            ArraySubset::new_with_ranges(&[1..3, 1..4]),
-            ArraySubset::new_with_ranges(&[2..4, 0..2]),
-        ];
-        let input_handle = Arc::new(std::io::Cursor::new(encoded.into_fixed().unwrap()));
+        let input_handle = Arc::new(encoded.into_fixed().unwrap());
         let bytes_codec = Arc::new(BytesCodec::default());
         let input_handle = bytes_codec
             .partial_decoder(
@@ -266,16 +349,12 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        assert_eq!(partial_decoder.size(), input_handle.size()); // transpose partial decoder does not hold bytes
-        let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
-            .unwrap();
-        let decoded_partial_chunk = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| {
-                crate::array::convert_from_bytes_slice::<f32>(&bytes.into_fixed().unwrap())
-            })
-            .collect::<Vec<_>>();
+        assert_eq!(partial_decoder.size_held(), input_handle.size_held()); // transpose partial decoder does not hold bytes
+        let decoded_regions = [
+            ArraySubset::new_with_ranges(&[0..4, 0..4]),
+            ArraySubset::new_with_ranges(&[1..3, 1..4]),
+            ArraySubset::new_with_ranges(&[2..4, 0..2]),
+        ];
         let answer: &[Vec<f32>] = &[
             vec![
                 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0,
@@ -284,7 +363,15 @@ mod tests {
             vec![5.0, 6.0, 7.0, 9.0, 10.0, 11.0],
             vec![8.0, 9.0, 12.0, 13.0],
         ];
-        assert_eq!(answer, decoded_partial_chunk);
+        for (decoded_region, expected) in decoded_regions.into_iter().zip(answer.iter()) {
+            let decoded_partial_chunk = partial_decoder
+                .partial_decode(&decoded_region, &CodecOptions::default())
+                .unwrap();
+            let decoded_partial_chunk = crate::array::convert_from_bytes_slice::<f32>(
+                &decoded_partial_chunk.into_fixed().unwrap(),
+            );
+            assert_eq!(expected, &decoded_partial_chunk);
+        }
     }
 
     #[cfg(feature = "async")]
@@ -309,12 +396,7 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        let decoded_regions = [
-            ArraySubset::new_with_ranges(&[0..4, 0..4]),
-            ArraySubset::new_with_ranges(&[1..3, 1..4]),
-            ArraySubset::new_with_ranges(&[2..4, 0..2]),
-        ];
-        let input_handle = Arc::new(std::io::Cursor::new(encoded.into_fixed().unwrap()));
+        let input_handle = Arc::new(encoded.into_fixed().unwrap());
         let bytes_codec = Arc::new(BytesCodec::default());
         let input_handle = bytes_codec
             .async_partial_decoder(
@@ -332,18 +414,11 @@ mod tests {
             )
             .await
             .unwrap();
-        let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
-            .await
-            .unwrap();
-        let decoded_partial_chunk = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| {
-                crate::array::transmute_from_bytes_vec::<f32>(
-                    bytes.into_fixed().unwrap().into_owned(),
-                )
-            })
-            .collect::<Vec<_>>();
+        let decoded_regions = [
+            ArraySubset::new_with_ranges(&[0..4, 0..4]),
+            ArraySubset::new_with_ranges(&[1..3, 1..4]),
+            ArraySubset::new_with_ranges(&[2..4, 0..2]),
+        ];
         let answer: &[Vec<f32>] = &[
             vec![
                 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0,
@@ -352,6 +427,15 @@ mod tests {
             vec![5.0, 6.0, 7.0, 9.0, 10.0, 11.0],
             vec![8.0, 9.0, 12.0, 13.0],
         ];
-        assert_eq!(answer, decoded_partial_chunk);
+        for (decoded_region, answer) in decoded_regions.into_iter().zip(answer.iter()) {
+            let decoded_partial_chunk = partial_decoder
+                .partial_decode(&decoded_region, &CodecOptions::default())
+                .await
+                .unwrap();
+            let decoded_partial_chunk = crate::array::convert_from_bytes_slice::<f32>(
+                &decoded_partial_chunk.into_fixed().unwrap(),
+            );
+            assert_eq!(answer, &decoded_partial_chunk);
+        }
     }
 }

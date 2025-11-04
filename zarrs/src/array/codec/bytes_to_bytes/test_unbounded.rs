@@ -16,7 +16,7 @@ mod tests {
             codec::{BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecOptions},
             BytesRepresentation,
         },
-        byte_range::ByteRange,
+        storage::byte_range::ByteRange,
     };
 
     use super::*;
@@ -54,7 +54,7 @@ mod tests {
             ByteRange::FromStart(10, Some(2)),
         ];
 
-        let input_handle = Arc::new(std::io::Cursor::new(encoded));
+        let input_handle = Arc::new(encoded);
         let partial_decoder = codec
             .partial_decoder(
                 input_handle.clone(),
@@ -62,11 +62,15 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        assert_eq!(partial_decoder.size(), input_handle.size()); // test unbounded partial decoder does not hold bytes
+        assert_eq!(partial_decoder.size_held(), input_handle.size_held()); // test unbounded partial decoder does not hold bytes
         let decoded_partial_chunk = partial_decoder
-            .partial_decode_concat(&decoded_regions, &CodecOptions::default())
+            .partial_decode_many(
+                Box::new(decoded_regions.into_iter()),
+                &CodecOptions::default(),
+            )
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .concat();
 
         let decoded_partial_chunk: Vec<u16> = decoded_partial_chunk
             .to_vec()
@@ -96,7 +100,7 @@ mod tests {
             ByteRange::FromStart(10, Some(2)),
         ];
 
-        let input_handle = Arc::new(std::io::Cursor::new(encoded));
+        let input_handle = Arc::new(encoded);
         let partial_decoder = codec
             .async_partial_decoder(
                 input_handle,
@@ -106,10 +110,14 @@ mod tests {
             .await
             .unwrap();
         let decoded_partial_chunk = partial_decoder
-            .partial_decode_concat(&decoded_regions, &CodecOptions::default())
+            .partial_decode_many(
+                Box::new(decoded_regions.into_iter()),
+                &CodecOptions::default(),
+            )
             .await
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .concat();
 
         let decoded_partial_chunk: Vec<u16> = decoded_partial_chunk
             .to_vec()

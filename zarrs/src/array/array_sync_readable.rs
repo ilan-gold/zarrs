@@ -1,7 +1,9 @@
 use std::{borrow::Cow, sync::Arc};
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rayon_iter_concurrent_limit::iter_concurrent_limit;
+
+use crate::iter_concurrent_limit;
 use unsafe_cell_slice::UnsafeCellSlice;
 
 use crate::{
@@ -821,8 +823,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> Array<TStorage> {
             self.codecs
                 .clone()
                 .partial_decoder(input_handle, &chunk_representation, options)?
-                .partial_decode(std::slice::from_ref(chunk_subset), options)?
-                .remove(0)
+                .partial_decode(chunk_subset, options)?
                 .into_owned()
         };
         bytes.validate(chunk_subset.num_elements(), self.data_type().size())?;

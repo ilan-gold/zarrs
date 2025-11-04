@@ -1,6 +1,9 @@
 use std::{num::NonZeroU64, sync::Arc};
 
-use crate::array::{DataType, FillValue};
+use crate::array::{
+    codec::{ArrayPartialEncoderTraits, PartialEncoderCapability},
+    DataType, FillValue,
+};
 use zarrs_metadata::Configuration;
 use zarrs_registry::codec::SQUEEZE;
 
@@ -8,7 +11,8 @@ use crate::{
     array::{
         codec::{
             ArrayBytes, ArrayCodecTraits, ArrayPartialDecoderTraits, ArrayToArrayCodecTraits,
-            CodecError, CodecMetadataOptions, CodecOptions, CodecTraits, RecommendedConcurrency,
+            CodecError, CodecMetadataOptions, CodecOptions, CodecTraits, PartialDecoderCapability,
+            RecommendedConcurrency,
         },
         ChunkRepresentation, ChunkShape,
     },
@@ -17,7 +21,7 @@ use crate::{
 use zarrs_metadata_ext::codec::squeeze::{SqueezeCodecConfiguration, SqueezeCodecConfigurationV0};
 
 #[cfg(feature = "async")]
-use crate::array::codec::AsyncArrayPartialDecoderTraits;
+use crate::array::codec::{AsyncArrayPartialDecoderTraits, AsyncArrayPartialEncoderTraits};
 
 /// A Squeeze codec implementation.
 #[derive(Clone, Debug)]
@@ -52,6 +56,12 @@ impl SqueezeCodec {
     }
 }
 
+impl Default for SqueezeCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CodecTraits for SqueezeCodec {
     fn identifier(&self) -> &str {
         SQUEEZE
@@ -66,16 +76,25 @@ impl CodecTraits for SqueezeCodec {
         Some(configuration.into())
     }
 
-    fn partial_decoder_should_cache_input(&self) -> bool {
-        false
+    fn partial_decoder_capability(&self) -> PartialDecoderCapability {
+        PartialDecoderCapability {
+            partial_read: true,
+            partial_decode: true,
+        }
     }
 
-    fn partial_decoder_decodes_all(&self) -> bool {
-        false
+    fn partial_encoder_capability(&self) -> PartialEncoderCapability {
+        PartialEncoderCapability {
+            partial_encode: true,
+        }
     }
 }
 
-#[cfg_attr(feature = "async", async_trait::async_trait)]
+#[cfg_attr(
+    all(feature = "async", not(target_arch = "wasm32")),
+    async_trait::async_trait
+)]
+#[cfg_attr(all(feature = "async", target_arch = "wasm32"), async_trait::async_trait(?Send))]
 impl ArrayToArrayCodecTraits for SqueezeCodec {
     fn into_dyn(self: Arc<Self>) -> Arc<dyn ArrayToArrayCodecTraits> {
         self as Arc<dyn ArrayToArrayCodecTraits>
@@ -138,8 +157,22 @@ impl ArrayToArrayCodecTraits for SqueezeCodec {
         _options: &CodecOptions,
     ) -> Result<Arc<dyn ArrayPartialDecoderTraits>, CodecError> {
         Ok(Arc::new(
-            super::squeeze_partial_decoder::SqueezePartialDecoder::new(
+            super::squeeze_codec_partial::SqueezeCodecPartial::new(
                 input_handle,
+                decoded_representation.clone(),
+            ),
+        ))
+    }
+
+    fn partial_encoder(
+        self: Arc<Self>,
+        input_output_handle: Arc<dyn ArrayPartialEncoderTraits>,
+        decoded_representation: &ChunkRepresentation,
+        _options: &CodecOptions,
+    ) -> Result<Arc<dyn ArrayPartialEncoderTraits>, CodecError> {
+        Ok(Arc::new(
+            super::squeeze_codec_partial::SqueezeCodecPartial::new(
+                input_output_handle,
                 decoded_representation.clone(),
             ),
         ))
@@ -153,8 +186,23 @@ impl ArrayToArrayCodecTraits for SqueezeCodec {
         _options: &CodecOptions,
     ) -> Result<Arc<dyn AsyncArrayPartialDecoderTraits>, CodecError> {
         Ok(Arc::new(
-            super::squeeze_partial_decoder::AsyncSqueezePartialDecoder::new(
+            super::squeeze_codec_partial::SqueezeCodecPartial::new(
                 input_handle,
+                decoded_representation.clone(),
+            ),
+        ))
+    }
+
+    #[cfg(feature = "async")]
+    async fn async_partial_encoder(
+        self: Arc<Self>,
+        input_output_handle: Arc<dyn AsyncArrayPartialEncoderTraits>,
+        decoded_representation: &ChunkRepresentation,
+        _options: &CodecOptions,
+    ) -> Result<Arc<dyn AsyncArrayPartialEncoderTraits>, CodecError> {
+        Ok(Arc::new(
+            super::squeeze_codec_partial::SqueezeCodecPartial::new(
+                input_output_handle,
                 decoded_representation.clone(),
             ),
         ))

@@ -302,8 +302,8 @@ mod tests {
             assert_eq!(bytes, decoded);
 
             // Partial decoding
-            let decoded_regions = [ArraySubset::new_with_ranges(&[1..4, 1..4])];
-            let input_handle = Arc::new(std::io::Cursor::new(encoded));
+            let decoded_region = ArraySubset::new_with_ranges(&[1..4, 1..4]);
+            let input_handle = Arc::new(encoded);
             let partial_decoder = codec
                 .partial_decoder(
                     input_handle.clone(),
@@ -311,11 +311,9 @@ mod tests {
                     &CodecOptions::default(),
                 )
                 .unwrap();
-            assert_eq!(partial_decoder.size(), input_handle.size()); // packbits partial decoder does not hold bytes
+            assert_eq!(partial_decoder.size_held(), input_handle.size_held()); // packbits partial decoder does not hold bytes
             let decoded_partial_chunk = partial_decoder
-                .partial_decode(&decoded_regions, &CodecOptions::default())
-                .unwrap()
-                .pop()
+                .partial_decode(&decoded_region, &CodecOptions::default())
                 .unwrap();
             let decoded_partial_chunk =
                 bool::from_array_bytes(&data_type, decoded_partial_chunk).unwrap();

@@ -13,6 +13,9 @@ pub const GZIP: &str = "gzip";
 /// Unique identifier for the `packbits` codec (registered).
 pub const PACKBITS: &str = "packbits";
 
+/// Unique identifier for the `reshape` codec (draft).
+pub const RESHAPE: &str = "reshape";
+
 /// Unique identifier for the `sharding_indexed` codec (registered, ZEP0002).
 pub const SHARDING: &str = "sharding_indexed";
 
@@ -46,7 +49,7 @@ pub const VLEN: &str = "vlen";
 /// Unique identifier for the `adler32` codec (`numcodecs`).
 pub const ADLER32: &str = "adler32";
 
-/// Unique identifier for the `bitround` codec (`numcodecs`).
+/// Unique identifier for the `bitround` codec (`registered`).
 pub const BITROUND: &str = "bitround";
 
 /// Unique identifier for the `bz2` codec (`numcodecs`).

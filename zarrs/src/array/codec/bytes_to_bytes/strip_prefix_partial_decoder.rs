@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use itertools::Itertools;
+use zarrs_storage::StorageError;
 
 use crate::{
     array::{
         codec::{BytesPartialDecoderTraits, CodecError, CodecOptions},
         RawBytes,
     },
-    byte_range::ByteRange,
+    storage::byte_range::{ByteRange, ByteRangeIterator},
 };
 
 #[cfg(feature = "async")]
@@ -33,27 +33,32 @@ impl StripPrefixPartialDecoder {
 }
 
 impl BytesPartialDecoderTraits for StripPrefixPartialDecoder {
-    fn size(&self) -> usize {
-        self.input_handle.size()
+    fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists()
     }
 
-    fn partial_decode(
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    fn partial_decode_many(
         &self,
-        decoded_regions: &[ByteRange],
+        decoded_regions: ByteRangeIterator,
         options: &CodecOptions,
     ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
-        let decoded_regions = decoded_regions
-            .iter()
-            .map(|range| match range {
-                ByteRange::FromStart(offset, length) => ByteRange::FromStart(
-                    offset.checked_add(self.prefix_size as u64).unwrap(),
-                    *length,
-                ),
-                ByteRange::Suffix(length) => ByteRange::Suffix(*length),
-            })
-            .collect_vec();
+        let decoded_regions = decoded_regions.map(|range| match range {
+            ByteRange::FromStart(offset, length) => {
+                ByteRange::FromStart(offset.checked_add(self.prefix_size as u64).unwrap(), length)
+            }
+            ByteRange::Suffix(length) => ByteRange::Suffix(length),
+        });
 
-        self.input_handle.partial_decode(&decoded_regions, options)
+        self.input_handle
+            .partial_decode_many(Box::new(decoded_regions), options)
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        self.input_handle.supports_partial_decode()
     }
 }
 
@@ -79,26 +84,35 @@ impl AsyncStripPrefixPartialDecoder {
 }
 
 #[cfg(feature = "async")]
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl AsyncBytesPartialDecoderTraits for AsyncStripPrefixPartialDecoder {
-    async fn partial_decode(
-        &self,
-        decoded_regions: &[ByteRange],
+    async fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists().await
+    }
+
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    async fn partial_decode_many<'a>(
+        &'a self,
+        decoded_regions: ByteRangeIterator<'a>,
         options: &CodecOptions,
-    ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
-        let decoded_regions = decoded_regions
-            .iter()
-            .map(|range| match range {
-                ByteRange::FromStart(offset, length) => ByteRange::FromStart(
-                    offset.checked_add(self.prefix_size as u64).unwrap(),
-                    *length,
-                ),
-                ByteRange::Suffix(length) => ByteRange::Suffix(*length),
-            })
-            .collect_vec();
+    ) -> Result<Option<Vec<RawBytes<'a>>>, CodecError> {
+        let decoded_regions = decoded_regions.map(|range| match range {
+            ByteRange::FromStart(offset, length) => {
+                ByteRange::FromStart(offset.checked_add(self.prefix_size as u64).unwrap(), length)
+            }
+            ByteRange::Suffix(length) => ByteRange::Suffix(length),
+        });
 
         self.input_handle
-            .partial_decode(&decoded_regions, options)
+            .partial_decode_many(Box::new(decoded_regions), options)
             .await
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        self.input_handle.supports_partial_decode()
     }
 }

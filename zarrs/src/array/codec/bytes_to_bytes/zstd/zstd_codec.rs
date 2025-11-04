@@ -8,7 +8,7 @@ use zstd::zstd_safe;
 use crate::array::{
     codec::{
         BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
-        RecommendedConcurrency,
+        PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency,
     },
     ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
@@ -72,16 +72,25 @@ impl CodecTraits for ZstdCodec {
         Some(configuration.into())
     }
 
-    fn partial_decoder_should_cache_input(&self) -> bool {
-        false
+    fn partial_decoder_capability(&self) -> PartialDecoderCapability {
+        PartialDecoderCapability {
+            partial_read: false,
+            partial_decode: false,
+        }
     }
 
-    fn partial_decoder_decodes_all(&self) -> bool {
-        true
+    fn partial_encoder_capability(&self) -> PartialEncoderCapability {
+        PartialEncoderCapability {
+            partial_encode: false,
+        }
     }
 }
 
-#[cfg_attr(feature = "async", async_trait::async_trait)]
+#[cfg_attr(
+    all(feature = "async", not(target_arch = "wasm32")),
+    async_trait::async_trait
+)]
+#[cfg_attr(all(feature = "async", target_arch = "wasm32"), async_trait::async_trait(?Send))]
 impl BytesToBytesCodecTraits for ZstdCodec {
     fn into_dyn(self: Arc<Self>) -> Arc<dyn BytesToBytesCodecTraits> {
         self as Arc<dyn BytesToBytesCodecTraits>

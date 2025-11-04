@@ -262,20 +262,13 @@ pub fn array_metadata_v2_to_v3(
         },
     )?;
 
-    let (Ok(data_type), endianness) = (
-        data_type_metadata_v2_to_v3(
-            &array_metadata_v2.dtype,
-            data_type_aliases_v2,
-            data_type_aliases_v3,
-        ),
-        data_type_metadata_v2_to_endianness(&array_metadata_v2.dtype)
-            .map_err(ArrayMetadataV2ToV3Error::InvalidEndianness)?,
-    ) else {
-        return Err(ArrayMetadataV2ToV3Error::UnsupportedDataType(
-            array_metadata_v2.dtype.clone(),
-        ));
-    };
-
+    let endianness = data_type_metadata_v2_to_endianness(&array_metadata_v2.dtype)
+        .map_err(ArrayMetadataV2ToV3Error::InvalidEndianness)?;
+    let data_type = data_type_metadata_v2_to_v3(
+        &array_metadata_v2.dtype,
+        data_type_aliases_v2,
+        data_type_aliases_v3,
+    )?;
     let fill_value = fill_value_metadata_v2_to_v3(&array_metadata_v2.fill_value, &data_type)?;
 
     let codecs = codec_metadata_v2_to_v3(
@@ -346,18 +339,22 @@ pub fn fill_value_metadata_v2_to_v3(
     // We add some special cases which are supported in v2 but not v3
     let converted_value = match (data_type.name(), converted_value) {
         // A missing fill value is "undefined", so we choose something reasonable
-        (name, None) => match name {
-            // Support zarr-python encoded string arrays with a `null` fill value
-            zarrs_registry::data_type::STRING => FillValueMetadataV3::from(""),
-            // Any other null fill value is "undefined"; we pick false for bools
-            zarrs_registry::data_type::BOOL => FillValueMetadataV3::from(false),
-            // And zero for other data types
-            _ => FillValueMetadataV3::from(0),
-        },
+        (name, None) => {
+            log::warn!("Fill value of `null` specified for data type {name}. This is unsupported in Zarr V3; mapping to a default value.");
+            match name {
+                // Support zarr-python encoded string arrays with a `null` fill value
+                zarrs_registry::data_type::STRING => FillValueMetadataV3::from(""),
+                // Any other null fill value is "undefined"; we pick false for bools
+                zarrs_registry::data_type::BOOL => FillValueMetadataV3::from(false),
+                // And zero for other data types
+                _ => FillValueMetadataV3::from(0),
+            }
+        }
         // Add a special case for `zarr-python` string data with a 0 fill value -> empty string
         (zarrs_registry::data_type::STRING, Some(FillValueMetadataV3::Number(n)))
             if n.as_u64() == Some(0) =>
         {
+            log::warn!("Permitting non-conformant `0` fill value for `string` data type (zarr-python compatibility).");
             FillValueMetadataV3::from("")
         }
         // Map a 0/1 scalar fill value to a bool

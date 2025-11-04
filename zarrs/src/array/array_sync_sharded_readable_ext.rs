@@ -1,7 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
+use crate::iter_concurrent_limit;
+
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rayon_iter_concurrent_limit::iter_concurrent_limit;
+
 use unsafe_cell_slice::UnsafeCellSlice;
 use zarrs_metadata::ConfigurationSerialize;
 use zarrs_metadata_ext::codec::sharding::ShardingCodecConfiguration;
@@ -31,14 +34,12 @@ enum MaybeShardingPartialDecoder {
 impl MaybeShardingPartialDecoder {
     fn partial_decode(
         &self,
-        array_subsets: &[ArraySubset],
+        indexer: &dyn crate::indexer::Indexer,
         options: &CodecOptions,
-    ) -> Result<Vec<ArrayBytes<'_>>, CodecError> {
+    ) -> Result<ArrayBytes<'_>, CodecError> {
         match self {
-            Self::Sharding(partial_decoder) => {
-                partial_decoder.partial_decode(array_subsets, options)
-            }
-            Self::Other(partial_decoder) => partial_decoder.partial_decode(array_subsets, options),
+            Self::Sharding(partial_decoder) => partial_decoder.partial_decode(indexer, options),
+            Self::Other(partial_decoder) => partial_decoder.partial_decode(indexer, options),
         }
     }
 }
@@ -144,7 +145,7 @@ impl ArrayShardedReadableExtCache {
                 MaybeShardingPartialDecoder::Sharding(Arc::new(ShardingPartialDecoder::new(
                     input_handle,
                     chunk_representation,
-                    sharding_codec.chunk_shape.clone(),
+                    &sharding_codec.chunk_shape,
                     sharding_codec.inner_codecs.clone(),
                     &sharding_codec.index_codecs,
                     sharding_codec.index_location,
@@ -366,7 +367,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
                 unreachable!("exlusively sharded")
             };
             // TODO: trait upcasting
-            // let partial_decoder: Arc<dyn Any + Send + Sync> = partial_decoder.clone();
+            // let partial_decoder: Arc<dyn Any + MaybeSend + MaybeSync> = partial_decoder.clone();
             // let partial_decoder = partial_decoder
             //     .downcast::<ShardingPartialDecoder>()
             //     .expect("array is exclusively sharded");
@@ -395,7 +396,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
                 unreachable!("exlusively sharded")
             };
             // TODO: trait upcasting
-            // let partial_decoder: Arc<dyn Any + Send + Sync> = partial_decoder.clone();
+            // let partial_decoder: Arc<dyn Any + MaybeSend + MaybeSync> = partial_decoder.clone();
             // let partial_decoder = partial_decoder
             //     .downcast::<ShardingPartialDecoder>()
             //     .expect("array is exclusively sharded");
@@ -424,8 +425,7 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
             )?;
             let partial_decoder = cache.retrieve(self, &shard_indices)?;
             let bytes = partial_decoder
-                .partial_decode(&[shard_subset], options)?
-                .remove(0)
+                .partial_decode(&shard_subset, options)?
                 .into_owned();
             Ok(bytes)
         } else {
@@ -564,10 +564,9 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
                             let bytes = cache
                                 .retrieve(self, &shard_indices)?
                                 .partial_decode(
-                                    &[shard_subset_overlap.relative_to(shard_subset.start())?],
+                                    &shard_subset_overlap.relative_to(shard_subset.start())?,
                                     &options,
                                 )?
-                                .remove(0)
                                 .into_owned();
                             Ok((
                                 bytes,
@@ -609,11 +608,9 @@ impl<TStorage: ?Sized + ReadableStorageTraits + 'static> ArrayShardedReadableExt
                                 let bytes = cache
                                     .retrieve(self, &shard_indices)?
                                     .partial_decode(
-                                        &[shard_subset_overlap
-                                            .relative_to(shard_subset.start())?],
+                                        &shard_subset_overlap.relative_to(shard_subset.start())?,
                                         &options,
                                     )?
-                                    .remove(0)
                                     .into_owned();
                                 let mut output_view = unsafe {
                                     // SAFETY: chunks represent disjoint array subsets

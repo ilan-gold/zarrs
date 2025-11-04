@@ -4,12 +4,11 @@ use std::{num::NonZeroU64, sync::Arc};
 
 use crate::array::{
     array_bytes::extract_decoded_regions_vlen,
-    codec::{
-        ArrayPartialDecoderTraits, ArraySubset, BytesPartialDecoderTraits, CodecError, CodecOptions,
-    },
+    codec::{ArrayPartialDecoderTraits, BytesPartialDecoderTraits, CodecError, CodecOptions},
     ArrayBytes, ArraySize, ChunkRepresentation, CodecChain, DataType, FillValue, RawBytes,
 };
 use zarrs_metadata_ext::codec::vlen::{VlenIndexDataType, VlenIndexLocation};
+use zarrs_storage::StorageError;
 
 #[cfg(feature = "async")]
 use crate::array::codec::{AsyncArrayPartialDecoderTraits, AsyncBytesPartialDecoderTraits};
@@ -52,11 +51,11 @@ fn decode_vlen_bytes<'a>(
     index_data_type: VlenIndexDataType,
     index_location: VlenIndexLocation,
     bytes: Option<RawBytes>,
-    decoded_regions: &[ArraySubset],
+    indexer: &dyn crate::indexer::Indexer,
     fill_value: &FillValue,
     shape: &[u64],
     options: &CodecOptions,
-) -> Result<Vec<ArrayBytes<'a>>, CodecError> {
+) -> Result<ArrayBytes<'a>, CodecError> {
     if let Some(bytes) = bytes {
         let num_elements = usize::try_from(shape.iter().product::<u64>()).unwrap();
         let index_shape = vec![unsafe { NonZeroU64::new_unchecked(1 + num_elements as u64) }];
@@ -83,17 +82,13 @@ fn decode_vlen_bytes<'a>(
             index_location,
             options,
         )?;
-        extract_decoded_regions_vlen(&data, &index, decoded_regions, shape)
+        extract_decoded_regions_vlen(&data, &index, indexer, shape)
     } else {
         // Chunk is empty, all decoded regions are empty
-        let mut output = Vec::with_capacity(decoded_regions.len());
-        for decoded_region in decoded_regions {
-            let array_size = ArraySize::Variable {
-                num_elements: decoded_region.num_elements(),
-            };
-            output.push(ArrayBytes::new_fill_value(array_size, fill_value));
-        }
-        Ok(output)
+        let array_size = ArraySize::Variable {
+            num_elements: indexer.len(),
+        };
+        Ok(ArrayBytes::new_fill_value(array_size, fill_value))
     }
 }
 
@@ -102,16 +97,20 @@ impl ArrayPartialDecoderTraits for VlenPartialDecoder {
         self.decoded_representation.data_type()
     }
 
-    fn size(&self) -> usize {
-        self.input_handle.size()
+    fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists()
+    }
+
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
     }
 
     fn partial_decode(
         &self,
-        decoded_regions: &[ArraySubset],
+        indexer: &dyn crate::indexer::Indexer,
         options: &CodecOptions,
-    ) -> Result<Vec<ArrayBytes<'_>>, CodecError> {
-        // Get all the input bytes (cached due to CodecTraits::partial_decoder_decodes_all() == true)
+    ) -> Result<ArrayBytes<'_>, CodecError> {
+        // Get all the input bytes (cached due to PartialDecoderCapability.partial_read == false)
         let bytes = self.input_handle.decode(options)?;
         decode_vlen_bytes(
             &self.index_codecs,
@@ -119,11 +118,15 @@ impl ArrayPartialDecoderTraits for VlenPartialDecoder {
             self.index_data_type,
             self.index_location,
             bytes,
-            decoded_regions,
+            indexer,
             self.decoded_representation.fill_value(),
             &self.decoded_representation.shape_u64(),
             options,
         )
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        false
     }
 }
 
@@ -161,18 +164,27 @@ impl AsyncVlenPartialDecoder {
 }
 
 #[cfg(feature = "async")]
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl AsyncArrayPartialDecoderTraits for AsyncVlenPartialDecoder {
     fn data_type(&self) -> &DataType {
         self.decoded_representation.data_type()
     }
 
-    async fn partial_decode(
-        &self,
-        decoded_regions: &[ArraySubset],
+    async fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists().await
+    }
+
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    async fn partial_decode<'a>(
+        &'a self,
+        indexer: &dyn crate::indexer::Indexer,
         options: &CodecOptions,
-    ) -> Result<Vec<ArrayBytes<'_>>, CodecError> {
-        // Get all the input bytes (cached due to CodecTraits::partial_decoder_decodes_all() == true)
+    ) -> Result<ArrayBytes<'a>, CodecError> {
+        // Get all the input bytes (cached due to PartialDecoderCapability.partial_read == false)
         let bytes = self.input_handle.decode(options).await?;
         decode_vlen_bytes(
             &self.index_codecs,
@@ -180,10 +192,14 @@ impl AsyncArrayPartialDecoderTraits for AsyncVlenPartialDecoder {
             self.index_data_type,
             self.index_location,
             bytes,
-            decoded_regions,
+            indexer,
             self.decoded_representation.fill_value(),
             &self.decoded_representation.shape_u64(),
             options,
         )
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        false
     }
 }

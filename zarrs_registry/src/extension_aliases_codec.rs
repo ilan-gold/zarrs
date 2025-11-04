@@ -14,8 +14,8 @@ impl Default for ExtensionAliasesCodecV3 {
         Self::new(
             // The default serialised `name`s
             HashMap::from([
-                // The default serialised `name`s
-                (codec::BITROUND, "numcodecs.bitround".into()),
+                // array to array
+                (codec::BITROUND, "bitround".into()),
                 (codec::FIXEDSCALEOFFSET, "numcodecs.fixedscaleoffset".into()),
                 (codec::SQUEEZE, "zarrs.squeeze".into()),
                 // array to bytes
@@ -36,14 +36,16 @@ impl Default for ExtensionAliasesCodecV3 {
             HashMap::from([
                 // core
                 ("endian".into(), codec::BYTES), // changed to bytes after provisional acceptance
+                // zarrs 0.22
+                ("bitround".into(), codec::BITROUND),
+                ("numcodecs.adler32".into(), codec::ADLER32),
+                ("zarrs.squeeze".into(), codec::SQUEEZE),
                 // zarrs 0.20
                 ("zarrs.vlen".into(), codec::VLEN),
                 ("zarrs.vlen_v2".into(), codec::VLEN_V2),
                 ("zfp".into(), codec::ZFP),
                 ("zarrs.zfp".into(), codec::ZFP), // 0.20.0-dev
                 ("zarrs.gdeflate".into(), codec::GDEFLATE),
-                // zarrs 0.22
-                ("numcodecs.adler32".into(), codec::ADLER32),
                 // zarrs 0.20 / zarr-python 3.0
                 ("numcodecs.bitround".into(), codec::BITROUND),
                 ("numcodecs.fixedscaleoffset".into(), codec::FIXEDSCALEOFFSET),
@@ -86,6 +88,8 @@ impl Default for ExtensionAliasesCodecV2 {
             ]),
             // `name` aliases (string match)
             HashMap::from([
+                // zarrs 0.22
+                ("zarrs.squeeze".into(), codec::SQUEEZE),
                 // zarrs 0.20
                 ("zarrs.vlen".into(), codec::VLEN),
                 ("zarrs.vlen_v2".into(), codec::VLEN_V2),

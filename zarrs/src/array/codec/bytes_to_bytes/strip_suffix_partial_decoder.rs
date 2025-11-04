@@ -1,11 +1,13 @@
 use std::{borrow::Cow, sync::Arc};
 
+use zarrs_storage::StorageError;
+
 use crate::{
     array::{
         codec::{BytesPartialDecoderTraits, CodecError, CodecOptions},
         RawBytes,
     },
-    byte_range::ByteRange,
+    storage::byte_range::{ByteRange, ByteRangeIterator},
 };
 
 #[cfg(feature = "async")]
@@ -31,39 +33,40 @@ impl StripSuffixPartialDecoder {
 }
 
 impl BytesPartialDecoderTraits for StripSuffixPartialDecoder {
-    fn size(&self) -> usize {
-        self.input_handle.size()
+    fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists()
     }
 
-    fn partial_decode(
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    fn partial_decode_many(
         &self,
-        decoded_regions: &[ByteRange],
+        decoded_regions: ByteRangeIterator,
         options: &CodecOptions,
     ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
-        let bytes = self.input_handle.partial_decode(decoded_regions, options)?;
-        let Some(bytes) = bytes else {
-            return Ok(None);
-        };
+        decoded_regions
+            .map(|decoded_region| {
+                let bytes = self.input_handle.partial_decode(decoded_region, options)?;
+                Ok::<_, CodecError>(bytes.map(|bytes| match decoded_region {
+                    ByteRange::FromStart(_, Some(_)) => bytes,
+                    ByteRange::FromStart(_, None) => {
+                        let length = bytes.len() - self.suffix_size;
+                        Cow::Owned(bytes[..length].to_vec())
+                    }
+                    ByteRange::Suffix(_) => {
+                        let length = bytes.len() as u64 - (self.suffix_size as u64);
+                        let length = usize::try_from(length).unwrap();
+                        Cow::Owned(bytes[..length].to_vec())
+                    }
+                }))
+            })
+            .collect()
+    }
 
-        // Drop suffix of length `suffix_size`
-        let mut output = Vec::with_capacity(bytes.len());
-        for (bytes, byte_range) in bytes.into_iter().zip(decoded_regions) {
-            let bytes = match byte_range {
-                ByteRange::FromStart(_, Some(_)) => bytes,
-                ByteRange::FromStart(_, None) => {
-                    let length = bytes.len() - self.suffix_size;
-                    Cow::Owned(bytes[..length].to_vec())
-                }
-                ByteRange::Suffix(_) => {
-                    let length = bytes.len() as u64 - (self.suffix_size as u64);
-                    let length = usize::try_from(length).unwrap();
-                    Cow::Owned(bytes[..length].to_vec())
-                }
-            };
-            output.push(bytes);
-        }
-
-        Ok(Some(output))
+    fn supports_partial_decode(&self) -> bool {
+        self.input_handle.supports_partial_decode()
     }
 }
 
@@ -89,39 +92,54 @@ impl AsyncStripSuffixPartialDecoder {
 }
 
 #[cfg(feature = "async")]
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl AsyncBytesPartialDecoderTraits for AsyncStripSuffixPartialDecoder {
-    async fn partial_decode(
-        &self,
-        decoded_regions: &[ByteRange],
+    async fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists().await
+    }
+
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    async fn partial_decode_many<'a>(
+        &'a self,
+        decoded_regions: ByteRangeIterator<'a>,
         options: &CodecOptions,
-    ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
-        let bytes = self
-            .input_handle
-            .partial_decode(decoded_regions, options)
+    ) -> Result<Option<Vec<RawBytes<'a>>>, CodecError> {
+        use futures::{StreamExt, TryStreamExt};
+
+        let futures = decoded_regions.map(|decoded_region| async move {
+            match decoded_region {
+                ByteRange::FromStart(_, Some(_)) => Ok::<_, CodecError>(
+                    self.input_handle
+                        .partial_decode(decoded_region, options)
+                        .await?,
+                ),
+                ByteRange::FromStart(_, None) | ByteRange::Suffix(_) => {
+                    let bytes = self
+                        .input_handle
+                        .partial_decode(decoded_region, options)
+                        .await?;
+                    if let Some(bytes) = bytes {
+                        let length = bytes.len() - self.suffix_size;
+                        Ok(Some(Cow::Owned(bytes[..length].to_vec())))
+                    } else {
+                        Ok(None)
+                    }
+                }
+            }
+        });
+        let results: Vec<Option<_>> = futures::stream::iter(futures)
+            .buffered(options.concurrent_target())
+            .try_collect()
             .await?;
-        let Some(bytes) = bytes else {
-            return Ok(None);
-        };
+        let results: Option<Vec<_>> = results.into_iter().collect();
+        Ok(results)
+    }
 
-        // Drop trailing checksum
-        let mut output = Vec::with_capacity(bytes.len());
-        for (bytes, byte_range) in bytes.into_iter().zip(decoded_regions) {
-            let bytes = match byte_range {
-                ByteRange::FromStart(_, Some(_)) => bytes,
-                ByteRange::FromStart(_, None) => {
-                    let length = bytes.len() - self.suffix_size;
-                    Cow::Owned(bytes[..length].to_vec())
-                }
-                ByteRange::Suffix(_) => {
-                    let length = bytes.len() as u64 - (self.suffix_size as u64);
-                    let length = usize::try_from(length).unwrap();
-                    Cow::Owned(bytes[..length].to_vec())
-                }
-            };
-            output.push(bytes);
-        }
-
-        Ok(Some(output))
+    fn supports_partial_decode(&self) -> bool {
+        self.input_handle.supports_partial_decode()
     }
 }

@@ -8,7 +8,8 @@ use crate::array::{
     codec::{
         bytes_to_bytes::strip_suffix_partial_decoder::StripSuffixPartialDecoder,
         BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
-        CodecOptions, CodecTraits, RecommendedConcurrency,
+        CodecOptions, CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
+        RecommendedConcurrency,
     },
     ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
@@ -53,12 +54,17 @@ impl CodecTraits for Fletcher32Codec {
         Some(configuration.into())
     }
 
-    fn partial_decoder_should_cache_input(&self) -> bool {
-        false
+    fn partial_decoder_capability(&self) -> PartialDecoderCapability {
+        PartialDecoderCapability {
+            partial_read: false,   // TODO
+            partial_decode: false, // TODO
+        }
     }
 
-    fn partial_decoder_decodes_all(&self) -> bool {
-        false
+    fn partial_encoder_capability(&self) -> PartialEncoderCapability {
+        PartialEncoderCapability {
+            partial_encode: false,
+        }
     }
 }
 
@@ -99,7 +105,11 @@ fn h5_checksum_fletcher32(data: &[u8]) -> u32 {
     (sum2 << 16) | sum1
 }
 
-#[cfg_attr(feature = "async", async_trait::async_trait)]
+#[cfg_attr(
+    all(feature = "async", not(target_arch = "wasm32")),
+    async_trait::async_trait
+)]
+#[cfg_attr(all(feature = "async", target_arch = "wasm32"), async_trait::async_trait(?Send))]
 impl BytesToBytesCodecTraits for Fletcher32Codec {
     fn into_dyn(self: Arc<Self>) -> Arc<dyn BytesToBytesCodecTraits> {
         self as Arc<dyn BytesToBytesCodecTraits>

@@ -30,7 +30,7 @@
 //! ```
 
 mod bytes_codec;
-mod bytes_partial_decoder;
+mod bytes_codec_partial;
 
 use std::sync::Arc;
 
@@ -40,10 +40,7 @@ pub use zarrs_metadata_ext::codec::bytes::{BytesCodecConfiguration, BytesCodecCo
 use zarrs_registry::codec::BYTES;
 
 pub use bytes_codec::BytesCodec;
-
-#[cfg(feature = "async")]
-pub(crate) use bytes_partial_decoder::AsyncBytesPartialDecoder;
-pub(crate) use bytes_partial_decoder::BytesPartialDecoder;
+pub(crate) use bytes_codec_partial::BytesCodecPartial;
 
 use crate::{
     array::{
@@ -64,6 +61,9 @@ fn is_identifier_bytes(identifier: &str) -> bool {
 }
 
 pub(crate) fn create_codec_bytes(metadata: &MetadataV3) -> Result<Codec, PluginCreateError> {
+    if metadata.name() == "binary" {
+        crate::warn_deprecated_extension("binary", "codec", Some("bytes"));
+    }
     let configuration: BytesCodecConfiguration = metadata
         .to_configuration()
         .map_err(|_| PluginMetadataInvalidError::new(BYTES, "codec", metadata.to_string()))?;
@@ -310,8 +310,8 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        let decoded_regions = [ArraySubset::new_with_ranges(&[1..3, 0..1])];
-        let input_handle = Arc::new(std::io::Cursor::new(encoded));
+        let decoded_region = ArraySubset::new_with_ranges(&[1..3, 0..1]);
+        let input_handle = Arc::new(encoded);
         let partial_decoder = codec
             .partial_decoder(
                 input_handle.clone(),
@@ -319,16 +319,14 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        assert_eq!(partial_decoder.size(), input_handle.size()); // bytes partial decoder does not hold bytes
+        assert_eq!(partial_decoder.size_held(), input_handle.size_held()); // bytes partial decoder does not hold bytes
         let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
+            .partial_decode(&decoded_region, &CodecOptions::default())
             .unwrap();
 
         let decoded_partial_chunk: Vec<u8> = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| bytes.into_fixed().unwrap().to_vec())
-            .flatten()
-            .collect::<Vec<_>>()
+            .into_fixed()
+            .unwrap()
             .chunks(size_of::<u8>())
             .map(|b| u8::from_ne_bytes(b.try_into().unwrap()))
             .collect();
@@ -354,8 +352,8 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        let decoded_regions = [ArraySubset::new_with_ranges(&[1..3, 0..1])];
-        let input_handle = Arc::new(std::io::Cursor::new(encoded));
+        let decoded_region = ArraySubset::new_with_ranges(&[1..3, 0..1]);
+        let input_handle = Arc::new(encoded);
         let partial_decoder = codec
             .async_partial_decoder(
                 input_handle,
@@ -365,15 +363,13 @@ mod tests {
             .await
             .unwrap();
         let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
+            .partial_decode(&decoded_region, &CodecOptions::default())
             .await
             .unwrap();
 
         let decoded_partial_chunk: Vec<u8> = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| bytes.into_fixed().unwrap().to_vec())
-            .flatten()
-            .collect::<Vec<_>>()
+            .into_fixed()
+            .unwrap()
             .chunks(size_of::<u8>())
             .map(|b| u8::from_ne_bytes(b.try_into().unwrap()))
             .collect();

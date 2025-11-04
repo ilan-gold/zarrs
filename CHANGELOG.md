@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Bump `zarrs_registry` to 0.1.7
+
+### Fixed
+- Avoid needlessly decoding entire chunks with `ChunkCache::retrieve_array_subset` on first read with a partial decoder cache
+
+## [0.22.6] - 2025-10-31
+
+### Added
+- Add `hierarchy` module with `Hierarchy` and `HierarchyCreateError` ([#288] by [@mannreis])
+
+### Changed
+- Bump `zarrs_data_type` to 0.4.2
+- Bump `zarrs_filesystem` to 0.3.4
+
+[#288]: https://github.com/zarrs/zarrs/pull/288
+
+## [0.22.5] - 2025-10-26
+
+### Added
+- Add `Array::set_shape_and_chunk_grid`
+- Add `node::[async_]get_child_nodes_opt`
+- Add `Group::storage()`
+- Add `DataType::is_fixed()` and `is_variable()`
+
+### Changed
+- Bump `zarrs_data_type` to 0.4.1
+- Bump `zarrs_metadata` to 0.6.2
+- Bump `zarrs_metadata_ext` to 0.2.2
+
+### Fixed
+- Respect `version` argument for children in `Node::[async_]open_opt`
+
+## [0.22.4] - 2025-10-13
+
+### Added
+- Log warnings when using experimental or deprecated extensions
+- Add `NamedDataType`
+
+### Changed
+- Bump `zarrs_metadata_ext` to 0.2.1
+- Document that the `binary` data type alias is deprecated
+
+### Fixed
+- Preserve aliased data type names in array metadata
+- Interpret string fill values as base64 encoded for the `variable_length_bytes` data type
+
+## [0.22.3] - 2025-10-11
+
+### Added
+- Add test with v3 `bytes` written by `zarr-python` 3.1 ([#282] by [@kylebarron])
+
+### Changed
+- Bump `zarrs_registry` to 0.1.6
+
+### Fixed
+- Replace use of removed `doc_auto_cfg` feature with `doc_cfg` (fixes `docs.rs` build)
+- Properly support Zarr V3 data type aliases, which were only being applied to data type plugins
+
+[#282]: https://github.com/zarrs/zarrs/pull/282
+
+## [0.22.2] - 2025-10-07
+
+### Changed
+- Bump `zarrs_filesystem` to 0.3.2
+  - Add direct I/O read support ([#249] by [@ilan-gold])
+- Open and warn zarr stores with non-zarr nodes ([#279] by [@mannreis])
+
+[#249]: https://github.com/zarrs/zarrs/pull/249
+[#279]: https://github.com/zarrs/zarrs/pull/279
+
+## [0.22.1] - 2025-09-19
+
+### Fixed
+- Bump `zarrs_data_type` to 0.4.0
+  - 0.3.3 was yanked as it missed a breaking change
+
+## [0.22.0] - 2025-09-18
+
+*This release was yanked.*
+
+### Highlights
+- This release includes several **Major Breaking** changes that will certainly require changes to user code.
+- Many foundational traits have been refactored for consistency, simplicity, and to support new capabilities.
+- Initial generic indexing and WASM support
+- More partial encoding support. It remains experimental and lightly documented.
+- New experimental extensions (codecs, chunk grids, chunk key encodings).
+
 ### Added
 - Add `index_location` support to `vlen` codec
   - Add `VlenCodec::with_index_location()`
@@ -15,9 +103,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `Array::storage()` and `Array::with_storage()`
 - Add `Array<T>::[async_]readable()` where `T: [Async]ReadableWritableStorageTraits`
 - Implement `Clone` for `Error` structs
+- Add `{Indices,Chunks,LinerisedIndices,ContiguousIndices,ContiguousLinearisedIndices}IntoIterator` and `Par{Indices,Chunks}IntoIterator`
+  - Implement `Into[Parallel]Iterator` for `Indices` and `IntoParallelRefIterator` for `&Indices`
+  - Implement `Into[Parallel]Iterator` for `Chunks` and `IntoParallelRefIterator` for `&Chunks`
+  - Implement `IntoIterator` for `{Linearised,Contiguous,ContiguousLinearised}Indices`
+- Impl `From<ChunkKeySeparator>` for `char`
+- Impl `From<RegularChunkGridCreateError>` for `IncompatibleDimensionalityError`
+- Add `ChunkGridTraits::[par_]iter_chunk_indices()`
+- Add `ArraySubset::chunk_shape()`
+- Impl `IntoIterator` for `ChunkShape`
+- Add `RegularBoundedChunkGrid` (`zarrs.regular_bounded`)
+- Add `DefaultSuffixChunkKeyEncoding` (`zarrs.default_suffix`)
+- Add initial generic indexing support to partial decoders
+  - Add `indexer` module with `Indexer` trait and `IncompatibleIndexerError`
+  - Implement `Indexer` for `ArraySubset`, `&ArraySubset`, `&[ArrayIndices]`, `&[T]` where `T: Indexer`, and more
+  - **Breaking**: Partial decoders and encoders use `&dyn Indexer` instead of `&ArraySubset`
+- Add `[StorageTransformerChain,StorageTransformerExtension]::create[_async]_readable_writable_transformer`
+- Add `CodecPartialDefault`
+- Add partial encoding support for the `bytes` codec
+- Add experimental `reshape` codec
+- Add `Array::async_partial_encoder`  and partial encoding support to `Array::async_store_chunk_subset_opt`
 
 ### Changed
-- **Breaking**: Refactor `ArrayBuilder`
+- **Major Breaking**: Refactor `ArrayBuilder`
   - All fields are now private
   - Add `ArrayBuilder::{new_with_chunk_grid,chunk_grid_metadata,build_metadata,attributes_mut}()`
   - Add `ArrayBuilder{ChunkGrid,DataType,FillValue}`
@@ -38,22 +146,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   )
   .build()
   ```
-- **Breaking**: change the `{Array,Chunk}Representation::new[_unchecked]` `fill_value` parameter to take `impl Into<FillValue>` instead of `FillValue`
+- **Major Breaking**: change the `{Array,Chunk}Representation::new[_unchecked]` `fill_value` parameter to take `impl Into<FillValue>` instead of `FillValue`
   ```diff
   -  ChunkRepresentation::new(chunk_shape(), DataType::Float32, 0.0f32.into())?,
   +  ChunkRepresentation::new(chunk_shape(), DataType::Float32, 0.0f32)?,
   ```
+- **Major Breaking**: `[Async]ArrayPartialDecoderTraits` trait changes: 
+  - `partial_decode[_into]()`: parameter `array_subsets: &[ArraySubset]` changed to `indexer: &dyn Indexer`
+  - `partial_decode[_into]()`: returns `ArrayBytes<'_>` instead of `Vec<ArrayBytes<'_>>`
+  - `partial_encode()`: parameter `subsets_and_bytes: &[(&ArraySubset, ArrayBytes<'_>)]` changed to `indexer: &dyn Indexer` and `bytes: &ArrayBytes<'_>`
+  - Rename `size()` to `size_held()` and add async version
+  - Add `supports_partial_decode`
+  - Add `exists()`
+- **Breaking**: `[Async]BytesPartialDecoderTraits` trait changes:
+  - Rename `partial_decode` to `partial_decode_many` and change parameter `decoded_regions: &[ByteRange]` to `ByteRangeIterator`
+  - Add `partial_decode` for decoding a single byte range
+  - Remove `partial_decode_concat`
+  - Rename `size()` to `size_held()` and add async version
+  - Add `supports_partial_decode`
+  - Add `exists()`
 - **Breaking**: `Array::set_shape()` now returns a `Result`
   - Previously it was possible to resize an array to a shape incompatible with a `rectangular` chunk grid
 - **Breaking**: Refactor `ChunkGridTraits` and `ChunkGridPlugin`, chunk grids are initialised with the array shape
+  - `ChunkGridTraits` is now an `unsafe` trait with invariants
   - `ChunkGrid::from_metadata()` and `{Regular,Rectangular}ChunkGrid::new()` now have an `ArrayShape` parameter
-  - Implementations must now implement `ChunkGridTraits::grid_shape()` as `grid_shape_unchecked()` has been removed
   - Add `ChunkGridTraits::array_shape()`
+  - Remove `_unchecked` methods and default implementations of associated checked methods
+    - Implementations must implement the checked methods instead
 - **Breaking**: `VlenCodec::new()` gains an `index_location` parameter
 - **Breaking**: `ArrayShardedExt::inner_chunk_grid_shape()` no longer returns an `Option`
 - **Breaking**: change `array::codecs()` to return an `Arc`d instead of borrowed `CodecChain` 
 - **Breaking**: Add `size()` method to `{Array,Bytes}PartialDecoderTraits`
-- **Breaking:: Refactor the `ChunkCache` trait
+- **Breaking**: Refactor the `ChunkCache` trait
   - The previous API supported misuse (e.g. using a chunk cache with different arrays)
   - **Breaking**: Add `retrieve_chunk_subset()` and `array()` methods (required)
   - Add `retrieve_{array_subset,chunks}()` methods with `_elements()` and `_ndarray()` variants (provided)
@@ -64,15 +188,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   +  let cache = ChunkCacheEncodedLruChunkLimit::new(array, 50);
   +  cache.retrieve_chunk(&[0, 1], &CodecOptions::default()),
   ```
+- **Breaking**: Change `byte_range::extract_byte_ranges_read_seek` to take `T` instead of `&mut T`
+- **Breaking**: Auto implement `[Async]BytesPartialDecoderTraits` for `T: AsRef<[u8]> + ...`
+- **Breaking**: `Arc` the `ChunkCache` types
+- **Breaking**: Change `Contiguous[Linearised]Indices` iterators to include the number of contiguous indices in their `Item`
+- **Breaking**: `ravel_indices` and `unravel_index` now return an `Option`, out-of-bounds access returns `None`
+- **Breaking**: `CodecError` enum revisions
+  - Rename `InvalidArraySubsetError` to `IncompatibleIndexer`
+  - Remove `InvalidArraySubsetDimensionalityError`, included in `IncompatibleIndexer`
+- **Breaking**: Refactor partial encoding and the `[Async]{Array,Bytes}PartialEncoderTraits` traits:
+  - The partial decoder traits are now a supertrait of the partial encoder traits
+  - Input/output handle parameters are fused in relevant methods
+  ```diff
+  - input_handle: Arc<dyn ArrayPartialDecoderTraits>,
+  - output_handle: Arc<dyn ArrayPartialEncoderTraits>,
+  + input_output_handle: Arc<dyn ArrayPartialEncoderTraits>,
+  ```
+  - Add `[Async]{Array,Bytes}PartialEncoderTraits::into_dyn_decoder`
+  - Impl `{Array,Bytes}PartialEncoderTrait` for `Mutex<Option<Vec<u8>>>`
+  - Add `supports_partial_encode`
+  - `[Async]BytesPartialEncoderTraits` specific trait changes:
+    - Rename `partial_encode` to `partial_encode_many` and change parameter `offsets_and_bytes: &[(ByteOffset, RawBytes<'_>)]` to `offset_values: OffsetBytesIterator<crate::array::RawBytes<'_>>`
+    - Add `partial_encode` for decoding a single byte range
+- **Breaking**: Remove `ArraySubset::byte_ranges`
+  - Replaced by `Indexer::iter_contiguous_byte_ranges`
+  - Add `CodecTraits::partial_decoder_capability` and `PartialDecoderCapability`
+    - `partial_decoder_capability` replaces `partial_decoder_should_cache_input` and `partial_decoder_decodes_all`
+  - Add `CodecTraits::partial_encoder_capability` and `PartialEncoderCapability`
+- **Breaking**: remove `experimental_` prefix from `codec_store_metadata_if_encode_only` and switch default to `true`
+- **Breaking**: Make `StoragePartialEncoder` generic over the underlying storage and add async support
+- Optimised chunk key encoders
+- Conditional use of `Send` / `Sync` / `async_trait(?Send)` based on `target_arch` for WASM compatibility ([#245] by [@keller-mark])
+- Use WASM compatible `rayon_iter_concurrent_limit` internally
 - Bump `zarrs_metadata_ext` to 0.2.0
 - Bump `zarrs_storage` to 0.4.0
 - Bump `blosc-src` to 0.3.6
+- Bump `criterion` (dev) to 0.7.0
+- Bump `float8` to 0.4.1
+- Bump `lru` to 0.16
+- Bump minimum `ndarray` to 0.15.4
+- Move `zarrs_opendal` to a new repository: `zarrs/zarrs_opendal`
 
 ### Removed
-- Remove `ArrayChunkCacheExt`. Use the `ChunkCache` methods instead
+- **Breaking**: Remove `ArrayChunkCacheExt`. Use the `ChunkCache` methods instead
+- **Breaking**: Remove `Par{Chunks,Indices}IteratorProducer`, which were unneeded
+- **Breaking**: Remove `[Async]BytesPartialDecoderTraits` implementations for `std::io::Cursor` variants
+- **Breaking**: Remove `ArraySubset::chunks()` and `array_subset::iterators::Chunks`
+- **Breaking**: Remove `storage::byte_range` re-export
+- **Breaking**: Remove `array_subset::IncompatibleArraySubsetAndShapeError`, replaced by `indexer::IncompatibleIndexerError`
+- **Breaking**: Remove `[Maybe]AsyncBytes`, which are identical to `[Maybe]Bytes`
+- **Breaking**: Remove `[Async]{ArrayToArray,ArrayToBytes,BytesToBytes}Partial{Encoder,Decoder}Default`
+  - Replaced by generic `CodecPartialDefault`
 
 ### Fixed
 - Permit data types with empty configurations that do not require one
+- Erase chunks before writing the updated chunk in `ArrayTo{Array,Bytes}PartialEncoderDefault`
+- Fix `squeeze` and `transpose` codec partial encoding
+- Fix `bitround` partial decoder needlessly rounding on decode
+
+[#245]: https://github.com/zarrs/zarrs/pull/245
+
+## [0.22.0-beta.3] - 2025-09-17
+
+## [0.22.0-beta.2] - 2025-09-13
+
+## [0.22.0-beta.1] - 2025-09-07
+
+## [0.22.0-beta.0] - 2025-09-06
 
 ## [0.21.2] - 2025-06-19
 
@@ -167,7 +349,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `AsyncArrayShardedReadableExt` and `AsyncArrayShardedReadableExtCache`
 - Add `ArrayBytesFixedDisjointViewCreateError::IncompatibleArraySubsetAndShapeError` [#156] by [@ilan-gold]
 - Add `CodecError::IncompatibleDimensionalityError` variant [#156] by [@ilan-gold]
-- Add `CodecError::{DataTypeExtension,IncompatibleFillValueError,InvalidArrayShape,InvalidNumberOfElements,SubsetOutOfBounds,RawBytesOffsetsCreate,RawBytesOffsetsOutOfBounds}` variants
+- Add `CodecError::{DataTypeExtension,IncompatibleFillValueError,InvalidArrayShape,InvalidNumberOfElements,SubsetOutOfBounds,RawBytesOffsetsCreate,RawBytesOffsetsOutOfBounds,InvalidIndexerError}` variants
 - Add `ArrayError::{ArrayBytesFixedDisjointViewCreateError,IncompatibleStartEndIndicesError,IncompatibleOffset,DlPackError}` variants
 - Add `CodecMetadataOptions` and `ArrayMetadataOptions::codec_options[_mut]`
 - Implement `From<T: IntoIterator<Item = Range<u64>>>` for `ArraySubset`
@@ -224,6 +406,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking**: Remove `{Array,Group}::additional_fields[_mut]`
 - **Breaking**: Remove `CodecTraits::create_metadata[_opt]()`
 - **Breaking**: Remove `Config::experimental_codec_names[_mut]`
+- **Breaking**: Remove `CodecError::InvalidArraySubsetError`
 
 ### Fixed
 - Fixed reserving one more element than necessary when retrieving `string` or `bytes` array elements
@@ -1470,7 +1653,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
  - Initial public release
 
-[unreleased]: https://github.com/zarrs/zarrs/compare/zarrs-v0.21.2...HEAD
+[unreleased]: https://github.com/zarrs/zarrs/compare/zarrs-v0.22.6...HEAD
+[0.22.6]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.6
+[0.22.5]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.5
+[0.22.4]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.4
+[0.22.3]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.3
+[0.22.2]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.2
+[0.22.1]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.1
+[0.22.0]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.0
+[0.22.0-beta.3]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.0-beta.3
+[0.22.0-beta.2]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.0-beta.2
+[0.22.0-beta.1]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.0-beta.1
+[0.22.0-beta.0]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.22.0-beta.0
 [0.21.2]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.21.2
 [0.21.1]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.21.1
 [0.21.0]: https://github.com/LDeakin/zarrs/releases/tag/zarrs-v0.21.0
@@ -1543,3 +1737,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [@niklasmueboe]: https://github.com/niklasmueboe
 [@ilan-gold]: https://github.com/ilan-gold
 [@jder]: https://github.com/jder
+[@keller-mark]: https://github.com/keller-mark
+[@mannreis]: https://github.com/mannreis
+[@kylebarron]: https://github.com/kylebarron
+[@mannreis]: https://github.com/mannreis

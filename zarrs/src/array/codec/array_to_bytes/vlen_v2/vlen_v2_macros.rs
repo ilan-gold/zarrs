@@ -47,7 +47,7 @@ macro_rules! vlen_v2_codec {
                 array_to_bytes::vlen_v2::VlenV2Codec, ArrayPartialDecoderTraits,
                 ArrayPartialEncoderTraits, ArrayToBytesCodecTraits, BytesPartialDecoderTraits,
                 BytesPartialEncoderTraits, CodecError, CodecMetadataOptions, CodecOptions,
-                CodecTraits,
+                CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
             },
             ArrayBytes, ArrayCodecTraits, BytesRepresentation, ChunkRepresentation, RawBytes,
             RecommendedConcurrency,
@@ -91,12 +91,12 @@ macro_rules! vlen_v2_codec {
                 self.inner.configuration_opt(name, options)
             }
 
-            fn partial_decoder_should_cache_input(&self) -> bool {
-                self.inner.partial_decoder_should_cache_input()
+            fn partial_decoder_capability(&self) -> PartialDecoderCapability {
+                self.inner.partial_decoder_capability()
             }
 
-            fn partial_decoder_decodes_all(&self) -> bool {
-                self.inner.partial_decoder_decodes_all()
+            fn partial_encoder_capability(&self) -> PartialEncoderCapability {
+                self.inner.partial_encoder_capability()
             }
         }
 
@@ -109,7 +109,11 @@ macro_rules! vlen_v2_codec {
             }
         }
 
-        #[cfg_attr(feature = "async", async_trait::async_trait)]
+        #[cfg_attr(
+            all(feature = "async", not(target_arch = "wasm32")),
+            async_trait::async_trait
+        )]
+        #[cfg_attr(all(feature = "async", target_arch = "wasm32"), async_trait::async_trait(?Send))]
         impl ArrayToBytesCodecTraits for $struct {
             fn into_dyn(self: Arc<Self>) -> Arc<dyn ArrayToBytesCodecTraits> {
                 self as Arc<dyn ArrayToBytesCodecTraits>
@@ -150,14 +154,12 @@ macro_rules! vlen_v2_codec {
 
             fn partial_encoder(
                 self: Arc<Self>,
-                input_handle: Arc<dyn BytesPartialDecoderTraits>,
-                output_handle: Arc<dyn BytesPartialEncoderTraits>,
+                input_output_handle: Arc<dyn BytesPartialEncoderTraits>,
                 decoded_representation: &ChunkRepresentation,
                 options: &CodecOptions,
             ) -> Result<Arc<dyn ArrayPartialEncoderTraits>, CodecError> {
                 self.inner.clone().partial_encoder(
-                    input_handle,
-                    output_handle,
+                    input_output_handle,
                     decoded_representation,
                     options,
                 )

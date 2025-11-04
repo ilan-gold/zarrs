@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
 use zarrs_storage::ReadableStorageTraits;
 
 use crate::{
+    array::codec::CodecTraits,
     array::ArrayBytes,
     array_subset::ArraySubset,
     storage::{ReadableWritableStorageTraits, StorageHandle},
@@ -11,8 +14,7 @@ use crate::{
 
 use super::{
     codec::{
-        ArrayPartialEncoderTraits, ArrayToBytesCodecTraits, CodecOptions, StoragePartialDecoder,
-        StoragePartialEncoder,
+        ArrayPartialEncoderTraits, ArrayToBytesCodecTraits, CodecOptions, StoragePartialEncoder,
     },
     concurrency::concurrency_chunks_and_codec,
     update_array_bytes, Array, ArrayError, Element,
@@ -197,10 +199,16 @@ impl<TStorage: ?Sized + ReadableWritableStorageTraits + 'static> Array<TStorage>
             // let mutex = self.storage.mutex(&key)?;
             // let _lock = mutex.lock();
 
-            if options.experimental_partial_encoding() {
+            if options.experimental_partial_encoding()
+                && self.codecs.partial_encoder_capability().partial_encode
+                && self.storage.supports_set_partial()
+            {
                 let partial_encoder = self.partial_encoder(chunk_indices, options)?;
-                Ok(partial_encoder
-                    .partial_encode(&[(chunk_subset, chunk_subset_bytes)], options)?)
+                debug_assert!(
+                    partial_encoder.supports_partial_encode(),
+                    "partial encoder is misrepresenting its capabilities"
+                );
+                Ok(partial_encoder.partial_encode(chunk_subset, &chunk_subset_bytes, options)?)
             } else {
                 // Decode the entire chunk
                 let chunk_bytes_old = self.retrieve_chunk_opt(chunk_indices, options)?;
@@ -333,7 +341,7 @@ impl<TStorage: ?Sized + ReadableWritableStorageTraits + 'static> Array<TStorage>
             };
 
             let indices = chunks.indices();
-            rayon_iter_concurrent_limit::iter_concurrent_limit!(
+            crate::iter_concurrent_limit!(
                 chunk_concurrent_limit,
                 indices,
                 try_for_each,
@@ -390,28 +398,19 @@ impl<TStorage: ?Sized + ReadableWritableStorageTraits + 'static> Array<TStorage>
     ) -> Result<Arc<dyn ArrayPartialEncoderTraits>, ArrayError> {
         let storage_handle = Arc::new(StorageHandle::new(self.storage.clone()));
 
-        // Input
-        let storage_transformer_read = self
-            .storage_transformers()
-            .create_readable_transformer(storage_handle.clone())?;
-        let input_handle = Arc::new(StoragePartialDecoder::new(
-            storage_transformer_read,
-            self.chunk_key(chunk_indices),
-        ));
         let chunk_representation = self.chunk_array_representation(chunk_indices)?;
 
-        // Output
-        let storage_transformer_write = self
+        // Input/output
+        let storage_transformer = self
             .storage_transformers()
-            .create_writable_transformer(storage_handle)?;
-        let output_handle = Arc::new(StoragePartialEncoder::new(
-            storage_transformer_write,
+            .create_readable_writable_transformer(storage_handle)?;
+        let input_output_handle = Arc::new(StoragePartialEncoder::new(
+            storage_transformer,
             self.chunk_key(chunk_indices),
         ));
 
         Ok(self.codecs.clone().partial_encoder(
-            input_handle,
-            output_handle,
+            input_output_handle,
             &chunk_representation,
             options,
         )?)

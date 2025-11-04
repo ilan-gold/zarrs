@@ -3,11 +3,13 @@ use std::{borrow::Cow, sync::Arc};
 use futures::{StreamExt, TryStreamExt};
 use unsafe_cell_slice::UnsafeCellSlice;
 
+use zarrs_storage::{MaybeSend, MaybeSync};
+
 use crate::{
     array_subset::ArraySubset,
     config::MetadataRetrieveVersion,
     node::{meta_key_v2_array, meta_key_v2_attributes, meta_key_v3, NodePath},
-    storage::{AsyncBytes, AsyncReadableStorageTraits, StorageError, StorageHandle},
+    storage::{AsyncReadableStorageTraits, Bytes, StorageError, StorageHandle},
 };
 
 use super::{
@@ -98,7 +100,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunk_elements_if_exists`](Array::retrieve_chunk_elements_if_exists).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunk_elements_if_exists<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_elements_if_exists<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         chunk_indices: &[u64],
     ) -> Result<Option<Vec<T>>, ArrayError> {
@@ -109,7 +113,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunk_ndarray_if_exists`](Array::retrieve_chunk_ndarray_if_exists).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunk_ndarray_if_exists<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_ndarray_if_exists<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
     ) -> Result<Option<ndarray::ArrayD<T>>, ArrayError> {
@@ -125,7 +129,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     pub async fn async_retrieve_encoded_chunk(
         &self,
         chunk_indices: &[u64],
-    ) -> Result<Option<AsyncBytes>, StorageError> {
+    ) -> Result<Option<Bytes>, StorageError> {
         let storage_handle = Arc::new(StorageHandle::new(self.storage.clone()));
         let storage_transformer = self
             .storage_transformers()
@@ -149,7 +153,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunk_elements`](Array::retrieve_chunk_elements).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunk_elements<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_elements<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
     ) -> Result<Vec<T>, ArrayError> {
@@ -160,7 +164,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunk_ndarray`](Array::retrieve_chunk_ndarray).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunk_ndarray<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_ndarray<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
     ) -> Result<ndarray::ArrayD<T>, ArrayError> {
@@ -180,7 +184,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunks_elements`](Array::retrieve_chunks_elements).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunks_elements<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunks_elements<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunks: &ArraySubset,
     ) -> Result<Vec<T>, ArrayError> {
@@ -191,7 +195,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunks_ndarray`](Array::retrieve_chunks_ndarray).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunks_ndarray<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunks_ndarray<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunks: &ArraySubset,
     ) -> Result<ndarray::ArrayD<T>, ArrayError> {
@@ -212,7 +216,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunk_subset_elements`](Array::retrieve_chunk_subset_elements).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunk_subset_elements<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_subset_elements<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
         chunk_subset: &ArraySubset,
@@ -228,7 +232,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunk_subset_ndarray`](Array::retrieve_chunk_subset_ndarray).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_chunk_subset_ndarray<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_subset_ndarray<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
         chunk_subset: &ArraySubset,
@@ -253,7 +257,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_array_subset_elements`](Array::retrieve_array_subset_elements).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_array_subset_elements<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_array_subset_elements<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         array_subset: &ArraySubset,
     ) -> Result<Vec<T>, ArrayError> {
@@ -264,7 +268,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_array_subset_ndarray`](Array::retrieve_array_subset_ndarray).
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-    pub async fn async_retrieve_array_subset_ndarray<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_array_subset_ndarray<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         array_subset: &ArraySubset,
     ) -> Result<ndarray::ArrayD<T>, ArrayError> {
@@ -384,7 +388,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunk_elements_if_exists_opt`](Array::retrieve_chunk_elements_if_exists_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunk_elements_if_exists_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_elements_if_exists_opt<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         chunk_indices: &[u64],
         options: &CodecOptions,
@@ -402,7 +408,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunk_elements_opt`](Array::retrieve_chunk_elements_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunk_elements_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_elements_opt<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
         options: &CodecOptions,
@@ -417,7 +423,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunk_ndarray_if_exists_opt`](Array::retrieve_chunk_ndarray_if_exists_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunk_ndarray_if_exists_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_ndarray_if_exists_opt<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         chunk_indices: &[u64],
         options: &CodecOptions,
@@ -440,7 +448,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunk_ndarray_opt`](Array::retrieve_chunk_ndarray_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunk_ndarray_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_ndarray_opt<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunk_indices: &[u64],
         options: &CodecOptions,
@@ -467,7 +475,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
         &self,
         chunks: &ArraySubset,
         options: &CodecOptions,
-    ) -> Result<Vec<Option<AsyncBytes>>, StorageError> {
+    ) -> Result<Vec<Option<Bytes>>, StorageError> {
         let storage_handle = Arc::new(StorageHandle::new(self.storage.clone()));
         let storage_transformer = self
             .storage_transformers()
@@ -512,7 +520,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunks_elements_opt`](Array::retrieve_chunks_elements_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunks_elements_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunks_elements_opt<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunks: &ArraySubset,
         options: &CodecOptions,
@@ -525,7 +533,7 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunks_ndarray_opt`](Array::retrieve_chunks_ndarray_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunks_ndarray_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunks_ndarray_opt<T: ElementOwned + MaybeSend + MaybeSync>(
         &self,
         chunks: &ArraySubset,
         options: &CodecOptions,
@@ -704,7 +712,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_array_subset_elements_opt`](Array::retrieve_array_subset_elements_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_array_subset_elements_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_array_subset_elements_opt<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         array_subset: &ArraySubset,
         options: &CodecOptions,
@@ -719,7 +729,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_array_subset_ndarray_opt`](Array::retrieve_array_subset_ndarray_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_array_subset_ndarray_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_array_subset_ndarray_opt<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         array_subset: &ArraySubset,
         options: &CodecOptions,
@@ -766,9 +778,8 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
                 .clone()
                 .async_partial_decoder(input_handle, &chunk_representation, options)
                 .await?
-                .partial_decode(std::slice::from_ref(chunk_subset), options)
+                .partial_decode(chunk_subset, options)
                 .await?
-                .remove(0)
                 .into_owned()
         };
         bytes.validate(chunk_subset.num_elements(), self.data_type().size())?;
@@ -819,7 +830,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
 
     /// Async variant of [`retrieve_chunk_subset_elements_opt`](Array::retrieve_chunk_subset_elements_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunk_subset_elements_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_subset_elements_opt<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         chunk_indices: &[u64],
         chunk_subset: &ArraySubset,
@@ -835,7 +848,9 @@ impl<TStorage: ?Sized + AsyncReadableStorageTraits + 'static> Array<TStorage> {
     #[cfg(feature = "ndarray")]
     /// Async variant of [`retrieve_chunk_subset_ndarray_opt`](Array::retrieve_chunk_subset_ndarray_opt).
     #[allow(clippy::missing_errors_doc)]
-    pub async fn async_retrieve_chunk_subset_ndarray_opt<T: ElementOwned + Send + Sync>(
+    pub async fn async_retrieve_chunk_subset_ndarray_opt<
+        T: ElementOwned + MaybeSend + MaybeSync,
+    >(
         &self,
         chunk_indices: &[u64],
         chunk_subset: &ArraySubset,

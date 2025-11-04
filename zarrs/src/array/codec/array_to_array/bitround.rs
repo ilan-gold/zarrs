@@ -1,8 +1,4 @@
-//! The `bitround` array to array codec (Experimental).
-//!
-//! <div class="warning">
-//! This codec is experimental and may be incompatible with other Zarr V3 implementations.
-//! </div>
+//! The `bitround` array to array codec.
 //!
 //! Round the mantissa of floating point data types to the specified number of bits.
 //! Rounds integers from the most significant set bit.
@@ -15,15 +11,11 @@
 //! However, it supports additional data types not supported by that implementation.
 //!
 //! ### Specification
-//! - <https://github.com/zarr-developers/zarr-extensions/tree/numcodecs/codecs/numcodecs.bitround>
+//! - <https://github.com/zarr-developers/zarr-extensions/blob/main/codecs/bitround/README.md>
 //! - <https://codec.zarrs.dev/array_to_array/bitround>
-// TODO: Document how integer rounding works
-//!
-//! ### Specification Deviations
-//! The `bitround` codec in `numcodecs` exclusively supports floating point data types.
-//! The `bitround` codec in `zarrs` additionally supports integers by rounding from the most significant set bit.
 //!
 //! ### Codec `name` Aliases (Zarr V3)
+//! - `bitround`
 //! - `numcodecs.bitround`
 //! - `https://codec.zarrs.dev/array_to_array/bitround`
 //!
@@ -42,7 +34,7 @@
 //! ```
 
 mod bitround_codec;
-mod bitround_partial_decoder;
+mod bitround_codec_partial;
 
 use std::sync::Arc;
 
@@ -290,7 +282,6 @@ mod tests {
     use std::{num::NonZeroU64, sync::Arc};
 
     use array_representation::ChunkRepresentation;
-    use itertools::Itertools;
 
     use crate::{
         array::{
@@ -435,11 +426,7 @@ mod tests {
             )
             .unwrap()
             .into_owned();
-        let decoded_regions = [
-            ArraySubset::new_with_ranges(&[3..5]),
-            ArraySubset::new_with_ranges(&[17..21]),
-        ];
-        let input_handle = Arc::new(std::io::Cursor::new(encoded.into_fixed().unwrap()));
+        let input_handle = Arc::new(encoded.into_fixed().unwrap());
         let bytes_codec = Arc::new(BytesCodec::default());
         let input_handle = bytes_codec
             .partial_decoder(
@@ -455,20 +442,21 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        assert_eq!(partial_decoder.size(), input_handle.size()); // bitround partial decoder does not hold bytes
-        let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
-            .unwrap();
-        let decoded_partial_chunk = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| {
-                crate::array::transmute_from_bytes_vec::<f32>(
-                    bytes.into_fixed().unwrap().into_owned(),
-                )
-            })
-            .collect_vec();
+        assert_eq!(partial_decoder.size_held(), input_handle.size_held()); // bitround partial decoder does not hold bytes
+        let decoded_regions = [
+            ArraySubset::new_with_ranges(&[3..5]),
+            ArraySubset::new_with_ranges(&[17..21]),
+        ];
         let answer: &[Vec<f32>] = &[vec![3.0, 4.0], vec![16.0, 16.0, 20.0, 20.0]];
-        assert_eq!(answer, decoded_partial_chunk);
+        for (decoded_region, expected) in decoded_regions.into_iter().zip(answer.iter()) {
+            let decoded_partial_chunk = partial_decoder
+                .partial_decode(&decoded_region, &CodecOptions::default())
+                .unwrap();
+            let decoded_partial_chunk = crate::array::convert_from_bytes_slice::<f32>(
+                &decoded_partial_chunk.into_fixed().unwrap(),
+            );
+            assert_eq!(expected, &decoded_partial_chunk);
+        }
     }
 
     #[cfg(feature = "async")]
@@ -495,11 +483,7 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        let decoded_regions = [
-            ArraySubset::new_with_ranges(&[3..5]),
-            ArraySubset::new_with_ranges(&[17..21]),
-        ];
-        let input_handle = Arc::new(std::io::Cursor::new(encoded.into_fixed().unwrap()));
+        let input_handle = Arc::new(encoded.into_fixed().unwrap());
         let bytes_codec = Arc::new(BytesCodec::default());
         let input_handle = bytes_codec
             .async_partial_decoder(
@@ -517,19 +501,20 @@ mod tests {
             )
             .await
             .unwrap();
-        let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
-            .await
-            .unwrap();
-        let decoded_partial_chunk = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| {
-                crate::array::transmute_from_bytes_vec::<f32>(
-                    bytes.into_fixed().unwrap().into_owned(),
-                )
-            })
-            .collect_vec();
+        let decoded_regions = [
+            ArraySubset::new_with_ranges(&[3..5]),
+            ArraySubset::new_with_ranges(&[17..21]),
+        ];
         let answer: &[Vec<f32>] = &[vec![3.0, 4.0], vec![16.0, 16.0, 20.0, 20.0]];
-        assert_eq!(answer, decoded_partial_chunk);
+        for (decoded_region, expected) in decoded_regions.into_iter().zip(answer.iter()) {
+            let decoded_partial_chunk = partial_decoder
+                .partial_decode(&decoded_region, &CodecOptions::default())
+                .await
+                .unwrap();
+            let decoded_partial_chunk = crate::array::convert_from_bytes_slice::<f32>(
+                &decoded_partial_chunk.into_fixed().unwrap(),
+            );
+            assert_eq!(expected, &decoded_partial_chunk);
+        }
     }
 }

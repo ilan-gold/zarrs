@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
+use zarrs_storage::StorageError;
+
 use crate::{
     array::RawBytes,
-    byte_range::{ByteLength, ByteOffset, ByteRange},
+    storage::byte_range::{ByteLength, ByteOffset, ByteRange, ByteRangeIterator},
 };
 
 use super::{BytesPartialDecoderTraits, CodecError, CodecOptions};
@@ -14,7 +16,7 @@ use super::AsyncBytesPartialDecoderTraits;
 ///
 /// Modifies byte range requests to a specific byte interval in an inner bytes partial decoder.
 pub struct ByteIntervalPartialDecoder {
-    inner: Arc<dyn BytesPartialDecoderTraits>,
+    input_handle: Arc<dyn BytesPartialDecoderTraits>,
     byte_offset: ByteOffset,
     byte_length: ByteLength,
 }
@@ -22,12 +24,12 @@ pub struct ByteIntervalPartialDecoder {
 impl ByteIntervalPartialDecoder {
     /// Create a new byte interval partial decoder.
     pub fn new(
-        inner: Arc<dyn BytesPartialDecoderTraits>,
+        input_handle: Arc<dyn BytesPartialDecoderTraits>,
         byte_offset: ByteOffset,
         byte_length: ByteLength,
     ) -> Self {
         Self {
-            inner,
+            input_handle,
             byte_offset,
             byte_length,
         }
@@ -35,31 +37,36 @@ impl ByteIntervalPartialDecoder {
 }
 
 impl BytesPartialDecoderTraits for ByteIntervalPartialDecoder {
-    fn size(&self) -> usize {
-        self.inner.size()
+    fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists()
     }
 
-    fn partial_decode(
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    fn partial_decode_many(
         &self,
-        byte_ranges: &[ByteRange],
+        byte_ranges: ByteRangeIterator,
         options: &CodecOptions,
     ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
-        let byte_ranges: Vec<ByteRange> = byte_ranges
-            .iter()
-            .map(|byte_range| match byte_range {
-                ByteRange::FromStart(offset, None) => {
-                    ByteRange::FromStart(self.byte_offset + offset, Some(self.byte_length))
-                }
-                ByteRange::FromStart(offset, Some(length)) => {
-                    ByteRange::FromStart(self.byte_offset + offset, Some(*length))
-                }
-                ByteRange::Suffix(length) => ByteRange::FromStart(
-                    self.byte_offset + self.byte_length - *length,
-                    Some(*length),
-                ),
-            })
-            .collect();
-        self.inner.partial_decode(&byte_ranges, options)
+        let byte_ranges = byte_ranges.map(|byte_range| match byte_range {
+            ByteRange::FromStart(offset, None) => {
+                ByteRange::FromStart(self.byte_offset + offset, Some(self.byte_length))
+            }
+            ByteRange::FromStart(offset, Some(length)) => {
+                ByteRange::FromStart(self.byte_offset + offset, Some(length))
+            }
+            ByteRange::Suffix(length) => {
+                ByteRange::FromStart(self.byte_offset + self.byte_length - length, Some(length))
+            }
+        });
+        self.input_handle
+            .partial_decode_many(Box::new(byte_ranges), options)
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        self.input_handle.supports_partial_decode()
     }
 }
 
@@ -68,7 +75,7 @@ impl BytesPartialDecoderTraits for ByteIntervalPartialDecoder {
 ///
 /// Modifies byte range requests to a specific byte interval in an inner bytes partial decoder.
 pub struct AsyncByteIntervalPartialDecoder {
-    inner: Arc<dyn AsyncBytesPartialDecoderTraits>,
+    input_handle: Arc<dyn AsyncBytesPartialDecoderTraits>,
     byte_offset: ByteOffset,
     byte_length: ByteLength,
 }
@@ -77,12 +84,12 @@ pub struct AsyncByteIntervalPartialDecoder {
 impl AsyncByteIntervalPartialDecoder {
     /// Create a new byte interval partial decoder.
     pub fn new(
-        inner: Arc<dyn AsyncBytesPartialDecoderTraits>,
+        input_handle: Arc<dyn AsyncBytesPartialDecoderTraits>,
         byte_offset: ByteOffset,
         byte_length: ByteLength,
     ) -> Self {
         Self {
-            inner,
+            input_handle,
             byte_offset,
             byte_length,
         }
@@ -90,28 +97,39 @@ impl AsyncByteIntervalPartialDecoder {
 }
 
 #[cfg(feature = "async")]
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl AsyncBytesPartialDecoderTraits for AsyncByteIntervalPartialDecoder {
-    async fn partial_decode(
-        &self,
-        byte_ranges: &[ByteRange],
+    async fn exists(&self) -> Result<bool, StorageError> {
+        self.input_handle.exists().await
+    }
+
+    fn size_held(&self) -> usize {
+        self.input_handle.size_held()
+    }
+
+    async fn partial_decode_many<'a>(
+        &'a self,
+        byte_ranges: ByteRangeIterator<'a>,
         options: &CodecOptions,
-    ) -> Result<Option<Vec<RawBytes<'_>>>, CodecError> {
-        let byte_ranges: Vec<ByteRange> = byte_ranges
-            .iter()
-            .map(|byte_range| match byte_range {
-                ByteRange::FromStart(offset, None) => {
-                    ByteRange::FromStart(self.byte_offset + offset, Some(self.byte_length))
-                }
-                ByteRange::FromStart(offset, Some(length)) => {
-                    ByteRange::FromStart(self.byte_offset + offset, Some(*length))
-                }
-                ByteRange::Suffix(length) => ByteRange::FromStart(
-                    self.byte_offset + self.byte_length - *length,
-                    Some(*length),
-                ),
-            })
-            .collect();
-        self.inner.partial_decode(&byte_ranges, options).await
+    ) -> Result<Option<Vec<RawBytes<'a>>>, CodecError> {
+        let byte_ranges = byte_ranges.map(|byte_range| match byte_range {
+            ByteRange::FromStart(offset, None) => {
+                ByteRange::FromStart(self.byte_offset + offset, Some(self.byte_length))
+            }
+            ByteRange::FromStart(offset, Some(length)) => {
+                ByteRange::FromStart(self.byte_offset + offset, Some(length))
+            }
+            ByteRange::Suffix(length) => {
+                ByteRange::FromStart(self.byte_offset + self.byte_length - length, Some(length))
+            }
+        });
+        self.input_handle
+            .partial_decode_many(Box::new(byte_ranges), options)
+            .await
+    }
+
+    fn supports_partial_decode(&self) -> bool {
+        self.input_handle.supports_partial_decode()
     }
 }

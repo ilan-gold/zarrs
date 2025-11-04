@@ -94,7 +94,6 @@ mod zfp_array;
 mod zfp_bitstream;
 mod zfp_codec;
 mod zfp_field;
-mod zfp_partial_decoder;
 mod zfp_stream;
 
 use std::sync::Arc;
@@ -683,7 +682,7 @@ mod tests {
             ArraySubset::new_with_ranges(&[0..3, 1..3, 2..3]),
         ];
 
-        let input_handle = Arc::new(std::io::Cursor::new(encoded));
+        let input_handle = Arc::new(encoded);
         let partial_decoder = codec
             .partial_decoder(
                 input_handle.clone(),
@@ -691,23 +690,24 @@ mod tests {
                 &CodecOptions::default(),
             )
             .unwrap();
-        assert_eq!(partial_decoder.size(), input_handle.size()); // zfp partial decoder does not hold bytes
-        let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
-            .unwrap();
+        assert_eq!(partial_decoder.size_held(), input_handle.size_held()); // zfp partial decoder does not hold bytes
 
-        let decoded_partial_chunk: Vec<f32> = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| bytes.into_fixed().unwrap().to_vec())
-            .flatten()
-            .collect::<Vec<_>>()
-            .chunks(size_of::<f32>())
-            .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
-            .collect();
-        let answer: Vec<f32> = vec![
-            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 5.0, 8.0, 14.0, 17.0, 23.0, 26.0,
-        ];
-        assert_eq!(answer, decoded_partial_chunk);
+        for (decoded_region, expected) in decoded_regions.into_iter().zip([
+            vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+            vec![5.0, 8.0, 14.0, 17.0, 23.0, 26.0],
+        ]) {
+            let decoded_partial_chunk = partial_decoder
+                .partial_decode(&decoded_region, &CodecOptions::default())
+                .unwrap();
+
+            let decoded_partial_chunk: Vec<f32> = decoded_partial_chunk
+                .into_fixed()
+                .unwrap()
+                .chunks(size_of::<f32>())
+                .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
+                .collect();
+            assert_eq!(decoded_partial_chunk, expected);
+        }
     }
 
     #[cfg(feature = "async")]
@@ -737,12 +737,8 @@ mod tests {
             )
             .unwrap();
         assert!((encoded.len() as u64) <= max_encoded_size.size().unwrap());
-        let decoded_regions = [
-            ArraySubset::new_with_shape(vec![1, 2, 3]),
-            ArraySubset::new_with_ranges(&[0..3, 1..3, 2..3]),
-        ];
 
-        let input_handle = Arc::new(std::io::Cursor::new(encoded));
+        let input_handle = Arc::new(encoded);
         let partial_decoder = codec
             .async_partial_decoder(
                 input_handle,
@@ -751,23 +747,29 @@ mod tests {
             )
             .await
             .unwrap();
-        let decoded_partial_chunk = partial_decoder
-            .partial_decode(&decoded_regions, &CodecOptions::default())
-            .await
-            .unwrap();
 
-        let decoded_partial_chunk: Vec<f32> = decoded_partial_chunk
-            .into_iter()
-            .map(|bytes| bytes.into_fixed().unwrap().to_vec())
-            .flatten()
-            .collect::<Vec<_>>()
-            .chunks(size_of::<f32>())
-            .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
-            .collect();
-        let answer: Vec<f32> = vec![
-            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 5.0, 8.0, 14.0, 17.0, 23.0, 26.0,
+        let decoded_regions = [
+            ArraySubset::new_with_shape(vec![1, 2, 3]),
+            ArraySubset::new_with_ranges(&[0..3, 1..3, 2..3]),
         ];
-        assert_eq!(answer, decoded_partial_chunk);
+
+        for (decoded_region, expected) in decoded_regions.into_iter().zip([
+            vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+            vec![5.0, 8.0, 14.0, 17.0, 23.0, 26.0],
+        ]) {
+            let decoded_partial_chunk = partial_decoder
+                .partial_decode(&decoded_region, &CodecOptions::default())
+                .await
+                .unwrap();
+
+            let decoded_partial_chunk: Vec<f32> = decoded_partial_chunk
+                .into_fixed()
+                .unwrap()
+                .chunks(size_of::<f32>())
+                .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
+                .collect();
+            assert_eq!(decoded_partial_chunk, expected);
+        }
     }
 
     #[test]
