@@ -305,13 +305,12 @@ impl ArrayToBytesCodecTraits for ShardingCodec {
                             let offset: usize = offset.try_into().unwrap();
                             let size: usize = size.try_into().unwrap();
                             let encoded_chunk = &encoded_shard[offset..offset + size];
-                            let decoded_chunk = self.inner_codecs.decode(
+                            self.inner_codecs.decode_into(
                                 Cow::Borrowed(encoded_chunk),
                                 &chunk_representation,
+                                &mut output_view_inner_chunk,
                                 &options,
                             )?;
-                            output_view_inner_chunk
-                                .copy_from_slice(&decoded_chunk.into_fixed()?)?;
                         }
 
                         Ok::<_, CodecError>(())

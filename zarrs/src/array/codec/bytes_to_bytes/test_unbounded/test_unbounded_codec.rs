@@ -7,7 +7,7 @@ use crate::array::{
         BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
         CodecOptions, CodecTraits, RecommendedConcurrency,
     },
-    BytesRepresentation, RawBytes,
+    BytesRepresentation, RawBytes, ArrayBytesFixedDisjointView
 };
 
 #[cfg(feature = "async")]
@@ -80,6 +80,17 @@ impl BytesToBytesCodecTraits for TestUnboundedCodec {
         _options: &CodecOptions,
     ) -> Result<RawBytes<'a>, CodecError> {
         Ok(encoded_value)
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &RawBytes<'_>,
+        _decoded_representation: &BytesRepresentation,
+        _options: &CodecOptions,
+        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+    ) -> Result<(), CodecError> {
+        // TODO: What does this do?
+        Ok(output_view.copy_from_slice(bytes)?)
     }
 
     fn partial_decoder(

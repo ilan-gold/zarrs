@@ -216,17 +216,19 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     ///
     /// # Errors
     /// Returns an [`InvalidBytesLengthError`] if the underyling bytes are not contiguous.
-    pub fn get_contiguous_slice(&self) -> Result<&'a mut[u8], InvalidBytesLengthError>  { // FIXME: better error
-        todo!("get slice!")
+    pub fn get_contiguous_slice(&self) -> Result<&mut[u8], InvalidBytesLengthError>  { // FIXME: better error
+        if self.is_contiguous() {
+            return Ok(unsafe { self.bytes.get_mut(0..self.num_contiguous_elements()).unwrap() });  // FIXME: unwrap
+        }
+        Err(InvalidBytesLengthError::new(self.num_contiguous_elements(), usize::try_from(self.num_elements()).unwrap()))
     }
 
-    /// Get a mutable reference to the underlying bytes if the array subset on this view are contiguous.
+    /// Say whether the view is contiguous in memory i.e., the final dimension matches that of the overal output buffer of which this is a view.
     ///
     ///
-    /// # Errors
-    /// Returns an [`InvalidBytesLengthError`] if the underyling bytes are not contiguous.
-    pub fn is_contiguous(&self) -> bool  { // FIXME: better error
-        todo!("get slice!")
+    /// Returns true if it is contiguous in memory.
+    pub fn is_contiguous(&self) -> bool  { 
+        self.subset.shape().last() == self.shape.last()
     }
 }
 

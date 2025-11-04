@@ -1352,6 +1352,8 @@ mod tests {
             .retrieve_array_subset_elements::<f32>(&subset_all)
             .unwrap();
 
+        println!("{elements:?}");
+
         assert_eq!(
             &elements,
             &[
