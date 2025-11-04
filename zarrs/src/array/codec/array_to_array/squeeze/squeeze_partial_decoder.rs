@@ -48,7 +48,7 @@ fn get_decoded_regions_squeezed(
             shape.iter()
         )
         .filter(|(_, _, &shape)| shape.get() > 1)
-        .map(|(rstart, rshape, _)| (*rstart..rstart + rshape));
+        .map(|(rstart, rshape, _)| *rstart..rstart + rshape);
 
         let decoded_region_squeeze = ArraySubset::from(ranges);
         decoded_regions_squeezed.push(decoded_region_squeeze);

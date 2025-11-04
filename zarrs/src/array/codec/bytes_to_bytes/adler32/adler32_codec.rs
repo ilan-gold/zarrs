@@ -13,7 +13,8 @@ use crate::array::{
         },
         BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
         CodecOptions, CodecTraits, RecommendedConcurrency,
-    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
+    },
+    ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
 
 #[cfg(feature = "async")]
@@ -152,14 +153,18 @@ impl BytesToBytesCodecTraits for Adler32Codec {
         }
     }
 
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: &RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
-        output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?)?;
+        output_view.copy_from_slice(&self.decode(
+            bytes.clone(),
+            decoded_representation,
+            options,
+        )?)?;
         Ok(())
     }
 

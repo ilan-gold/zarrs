@@ -216,18 +216,27 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     ///
     /// # Errors
     /// Returns an [`InvalidBytesLengthError`] if the underyling bytes are not contiguous.
-    pub fn get_contiguous_slice(&self) -> Result<&mut[u8], InvalidBytesLengthError>  { // FIXME: better error
+    pub fn get_contiguous_slice(&mut self) -> Result<&mut [u8], InvalidBytesLengthError> {
+        // FIXME: better error
         if self.is_contiguous() {
-            return Ok(unsafe { self.bytes.get_mut(0..self.num_contiguous_elements()).unwrap() });  // FIXME: unwrap
+            return Ok(unsafe {
+                self.bytes
+                    .get_mut(0..self.num_contiguous_elements())
+                    .unwrap() // FIXME: unwrap
+            });
         }
-        Err(InvalidBytesLengthError::new(self.num_contiguous_elements(), usize::try_from(self.num_elements()).unwrap()))
+        Err(InvalidBytesLengthError::new(
+            self.num_contiguous_elements(),
+            usize::try_from(self.num_elements()).unwrap(),
+        ))
     }
 
     /// Say whether the view is contiguous in memory i.e., the final dimension matches that of the overal output buffer of which this is a view.
     ///
     ///
     /// Returns true if it is contiguous in memory.
-    pub fn is_contiguous(&self) -> bool  { 
+    #[must_use] 
+    pub fn is_contiguous(&self) -> bool {
         self.subset.shape().last() == self.shape.last()
     }
 }

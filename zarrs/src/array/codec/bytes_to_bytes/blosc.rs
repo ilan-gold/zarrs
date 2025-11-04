@@ -195,7 +195,6 @@ fn blosc_nbytes(src: &[u8]) -> Option<usize> {
     (uncompressed_bytes > 0 && cbytes > 0 && blocksize > 0).then_some(uncompressed_bytes)
 }
 
-
 fn blosc_decompress_bytes_into(
     src: &[u8],
     destsize: usize,

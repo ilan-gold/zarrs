@@ -54,7 +54,7 @@ fn get_decoded_regions_transposed(
     for decoded_region in decoded_regions {
         let start = permute(decoded_region.start(), &order.0);
         let size = permute(decoded_region.shape(), &order.0);
-        let ranges = start.iter().zip(size).map(|(&st, si)| (st..(st + si)));
+        let ranges = start.iter().zip(size).map(|(&st, si)| st..(st + si));
         let decoded_region_transpose = ArraySubset::from(ranges);
         decoded_regions_transposed.push(decoded_region_transpose);
     }

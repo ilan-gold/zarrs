@@ -7,7 +7,7 @@ use crate::array::{
         BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
         CodecOptions, CodecTraits, RecommendedConcurrency,
     },
-    BytesRepresentation, RawBytes, ArrayBytesFixedDisjointView
+    ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
 
 #[cfg(feature = "async")]

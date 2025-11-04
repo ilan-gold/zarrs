@@ -13,7 +13,8 @@ use crate::array::{
     codec::{
         BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
         RecommendedConcurrency,
-    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
+    },
+    ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
 
 use super::{
@@ -119,15 +120,18 @@ impl BytesToBytesCodecTraits for GzipCodec {
         Ok(Cow::Owned(out))
     }
 
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: &RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         _decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
         let mut decoder = GzDecoder::new(Cursor::new(bytes));
-        decoder.read(output_view.get_contiguous_slice()?)?;
+        let size = decoder.read(output_view.get_contiguous_slice()?)?;
+        if size != usize::try_from(output_view.num_elements()).unwrap() {
+            todo!("err!")
+        }
         Ok(())
     }
 

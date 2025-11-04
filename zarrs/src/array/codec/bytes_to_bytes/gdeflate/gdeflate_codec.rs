@@ -5,7 +5,8 @@ use zarrs_plugin::PluginCreateError;
 use zarrs_registry::codec::GDEFLATE;
 
 use crate::array::{
-    codec::{BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits}, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes, RecommendedConcurrency
+    codec::{BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits},
+    ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes, RecommendedConcurrency,
 };
 
 use super::{
@@ -129,9 +130,9 @@ impl BytesToBytesCodecTraits for GDeflateCodec {
         Ok(Cow::Owned(gdeflate_decode(&encoded_value)?))
     }
 
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: &RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         _decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,

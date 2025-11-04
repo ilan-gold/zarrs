@@ -23,6 +23,12 @@ use crate::array::codec::AsyncArrayPartialDecoderTraits;
 #[derive(Clone, Debug)]
 pub struct SqueezeCodec {}
 
+impl Default for SqueezeCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SqueezeCodec {
     /// Create a new squeeze codec from configuration.
     ///

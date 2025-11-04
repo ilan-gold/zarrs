@@ -185,7 +185,7 @@ impl ArrayToBytesCodecTraits for BytesCodec {
         }
         true
     }
-        
+
     fn decode<'a>(
         &self,
         bytes: RawBytes<'a>,

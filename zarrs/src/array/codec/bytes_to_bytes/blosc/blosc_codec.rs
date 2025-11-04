@@ -9,7 +9,8 @@ use crate::{
         codec::{
             BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
             CodecOptions, CodecTraits, RecommendedConcurrency,
-        }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
+        },
+        ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
     },
     plugin::PluginCreateError,
 };
@@ -18,9 +19,10 @@ use crate::{
 use crate::array::codec::AsyncBytesPartialDecoderTraits;
 
 use super::{
-    blosc_compress_bytes, blosc_decompress_bytes_into, blosc_decompress_bytes, blosc_partial_decoder, blosc_validate,
-    compressor_as_cstr, BloscCodecConfiguration, BloscCodecConfigurationV1, BloscCompressionLevel,
-    BloscCompressor, BloscError, BloscShuffleMode,
+    blosc_compress_bytes, blosc_decompress_bytes, blosc_decompress_bytes_into,
+    blosc_partial_decoder, blosc_validate, compressor_as_cstr, BloscCodecConfiguration,
+    BloscCodecConfigurationV1, BloscCompressionLevel, BloscCompressor, BloscError,
+    BloscShuffleMode,
 };
 
 /// A `blosc` codec implementation.
@@ -139,7 +141,11 @@ impl BloscCodec {
         )
     }
 
-    fn do_decode_into(encoded_value: &[u8], n_threads: usize, out: &mut [u8]) -> Result<(), CodecError> {
+    fn do_decode_into(
+        encoded_value: &[u8],
+        n_threads: usize,
+        out: &mut [u8],
+    ) -> Result<(), CodecError> {
         blosc_validate(encoded_value).map_or_else(
             || Err(CodecError::from("blosc encoded value is invalid")),
             |destsize| {

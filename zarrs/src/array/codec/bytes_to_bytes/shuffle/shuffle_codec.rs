@@ -8,7 +8,8 @@ use crate::array::{
     codec::{
         BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
         RecommendedConcurrency,
-    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
+    },
+    ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
 
 use super::{ShuffleCodecConfiguration, ShuffleCodecConfigurationV1};
@@ -133,9 +134,9 @@ impl BytesToBytesCodecTraits for ShuffleCodec {
         Ok(Cow::Owned(decoded_value))
     }
 
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: &RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,

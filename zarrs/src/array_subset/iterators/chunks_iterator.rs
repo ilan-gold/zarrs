@@ -136,7 +136,7 @@ pub struct ChunksIterator<'a> {
 impl ChunksIterator<'_> {
     fn chunk_indices_with_subset(&self, chunk_indices: Vec<u64>) -> (Vec<u64>, ArraySubset) {
         let ranges =
-            std::iter::zip(&chunk_indices, self.chunk_shape).map(|(i, c)| ((i * c)..(i * c) + c));
+            std::iter::zip(&chunk_indices, self.chunk_shape).map(|(i, c)| (i * c)..(i * c) + c);
         let chunk_subset = ArraySubset::from(ranges);
         (chunk_indices, chunk_subset)
     }

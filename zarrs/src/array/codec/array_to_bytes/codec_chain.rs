@@ -380,7 +380,9 @@ impl ArrayToBytesCodecTraits for CodecChain {
     }
 
     fn is_no_op(&self) -> bool {
-        self.bytes_to_bytes.is_empty() && self.array_to_array.is_empty() && self.array_to_bytes.is_no_op()
+        self.bytes_to_bytes.is_empty()
+            && self.array_to_array.is_empty()
+            && self.array_to_bytes.is_no_op()
     }
 
     fn decode_into(
@@ -405,7 +407,9 @@ impl ArrayToBytesCodecTraits for CodecChain {
             );
         }
 
-        let can_bytes_to_bytes_direct = self.array_to_bytes.is_no_op() && self.array_to_array.is_empty() && output_view.is_contiguous();
+        let can_bytes_to_bytes_direct = self.array_to_bytes.is_no_op()
+            && self.array_to_array.is_empty()
+            && output_view.is_contiguous();
         // bytes->bytes
         for (codec, bytes_representation) in std::iter::zip(
             self.bytes_to_bytes.iter().rev(),

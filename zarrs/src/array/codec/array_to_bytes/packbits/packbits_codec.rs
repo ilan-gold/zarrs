@@ -238,7 +238,6 @@ impl ArrayToBytesCodecTraits for PackBitsCodec {
         Endianness::Little.is_native()
     }
 
-
     fn decode<'a>(
         &self,
         bytes: RawBytes<'a>,

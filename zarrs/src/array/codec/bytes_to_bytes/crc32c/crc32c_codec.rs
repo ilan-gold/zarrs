@@ -8,7 +8,8 @@ use crate::array::{
         bytes_to_bytes::strip_suffix_partial_decoder::StripSuffixPartialDecoder,
         BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
         CodecOptions, CodecTraits, RecommendedConcurrency,
-    }, ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes
+    },
+    ArrayBytesFixedDisjointView, BytesRepresentation, RawBytes,
 };
 
 #[cfg(feature = "async")]
@@ -108,14 +109,14 @@ impl BytesToBytesCodecTraits for Crc32cCodec {
         }
     }
 
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: &RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         _decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
-                if bytes.len() >= CHECKSUM_SIZE {
+        if bytes.len() >= CHECKSUM_SIZE {
             if options.validate_checksums() {
                 let decoded_value = &bytes[..bytes.len() - CHECKSUM_SIZE];
                 let checksum = crc32c::crc32c(decoded_value).to_le_bytes();
