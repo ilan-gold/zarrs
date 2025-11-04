@@ -132,10 +132,10 @@ impl BytesToBytesCodecTraits for GDeflateCodec {
 
     fn decode_into(
         &self,
-        bytes: &RawBytes<'_>,
+        _bytes: &RawBytes<'_>,
         _decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
-        output_view: &mut ArrayBytesFixedDisjointView<'_>,
+        _output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
         todo!("Refactor gdefalte_decode or create a different gdeflate_decode_into to use the output buffer")
     }

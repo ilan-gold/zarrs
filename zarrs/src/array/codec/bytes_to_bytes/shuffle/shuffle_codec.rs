@@ -137,8 +137,8 @@ impl BytesToBytesCodecTraits for ShuffleCodec {
     fn decode_into(
         &self,
         bytes: &RawBytes<'_>,
-        decoded_representation: &BytesRepresentation,
-        options: &CodecOptions,
+        _decoded_representation: &BytesRepresentation,
+        _options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
         if !is_multiple_of(bytes.len(), self.elementsize) {

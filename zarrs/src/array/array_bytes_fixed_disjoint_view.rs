@@ -216,14 +216,16 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     ///
     /// # Errors
     /// Returns an [`InvalidBytesLengthError`] if the underyling bytes are not contiguous.
+    /// # Panics
+    /// Panics if the total number of elements exceeds [`usize::MAX`].
     pub fn get_contiguous_slice(&mut self) -> Result<&mut [u8], InvalidBytesLengthError> {
         // FIXME: better error
         if self.is_contiguous() {
-            return Ok(unsafe {
-                self.bytes
-                    .get_mut(0..self.num_contiguous_elements())
-                    .unwrap() // FIXME: unwrap
-            });
+            let mut_slice = unsafe { self.bytes.get_mut(0..self.num_contiguous_elements()) };
+            return mut_slice.ok_or(InvalidBytesLengthError::new(
+                self.num_contiguous_elements(),
+                usize::try_from(self.num_elements()).unwrap(),
+            ));
         }
         Err(InvalidBytesLengthError::new(
             self.num_contiguous_elements(),
@@ -235,7 +237,7 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     ///
     ///
     /// Returns true if it is contiguous in memory.
-    #[must_use] 
+    #[must_use]
     pub fn is_contiguous(&self) -> bool {
         self.subset.shape().last() == self.shape.last()
     }
