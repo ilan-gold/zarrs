@@ -96,6 +96,10 @@ impl ArrayToBytesCodecTraits for VlenV2Codec {
         Ok(data.into())
     }
 
+    fn is_no_op(&self) -> bool {
+        false
+    }
+
     fn decode<'a>(
         &self,
         bytes: RawBytes<'a>,

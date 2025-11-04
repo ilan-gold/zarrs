@@ -154,12 +154,12 @@ impl BytesToBytesCodecTraits for Adler32Codec {
 
     fn decode_into<'a>(
         &self,
-        bytes: RawBytes<'a>,
+        bytes: &RawBytes<'a>,
         decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
-        output_view.copy_from_slice(&self.decode(bytes, decoded_representation, options)?)?;
+        output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?)?;
         Ok(())
     }
 

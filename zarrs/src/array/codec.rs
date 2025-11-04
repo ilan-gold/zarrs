@@ -930,6 +930,12 @@ pub trait ArrayToBytesCodecTraits: ArrayCodecTraits + core::fmt::Debug {
         options: &CodecOptions,
     ) -> Result<ArrayBytes<'a>, CodecError>;
 
+    /// Decode a chunk.
+    ///
+    /// # Errors
+    /// Returns [`CodecError`] if a codec fails or the decoded output is incompatible with `decoded_representation`.
+    fn is_no_op(&self) -> bool;
+
     /// Decode into a subset of a preallocated output.
     ///
     /// This method is intended for internal use by Array.
@@ -1096,9 +1102,9 @@ pub trait BytesToBytesCodecTraits: CodecTraits + core::fmt::Debug {
     ///
     /// # Errors
     /// Returns [`CodecError`] if a codec fails or the decoded output is incompatible with `decoded_representation`.
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,

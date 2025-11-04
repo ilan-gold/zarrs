@@ -178,6 +178,10 @@ impl ArrayToBytesCodecTraits for ShardingCodec {
         Ok(RawBytes::from(bytes))
     }
 
+    fn is_no_op(&self) -> bool {
+        false
+    }
+
     #[allow(clippy::too_many_lines)]
     fn decode<'a>(
         &self,

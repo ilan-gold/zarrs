@@ -124,6 +124,10 @@ macro_rules! vlen_v2_codec {
                 self.inner.encode(bytes, decoded_representation, options)
             }
 
+            fn is_no_op(&self) -> bool {
+                false
+            }
+
             fn decode<'a>(
                 &self,
                 bytes: RawBytes<'a>,

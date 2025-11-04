@@ -121,7 +121,7 @@ impl BytesToBytesCodecTraits for GzipCodec {
 
     fn decode_into<'a>(
         &self,
-        bytes: RawBytes<'a>,
+        bytes: &RawBytes<'a>,
         _decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,

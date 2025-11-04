@@ -135,7 +135,7 @@ impl BytesToBytesCodecTraits for ShuffleCodec {
 
     fn decode_into<'a>(
         &self,
-        bytes: RawBytes<'a>,
+        bytes: &RawBytes<'a>,
         decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,

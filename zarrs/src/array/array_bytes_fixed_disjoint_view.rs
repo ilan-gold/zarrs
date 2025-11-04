@@ -219,6 +219,15 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     pub fn get_contiguous_slice(&self) -> Result<&'a mut[u8], InvalidBytesLengthError>  { // FIXME: better error
         todo!("get slice!")
     }
+
+    /// Get a mutable reference to the underlying bytes if the array subset on this view are contiguous.
+    ///
+    ///
+    /// # Errors
+    /// Returns an [`InvalidBytesLengthError`] if the underyling bytes are not contiguous.
+    pub fn is_contiguous(&self) -> bool  { // FIXME: better error
+        todo!("get slice!")
+    }
 }
 
 #[cfg(test)]

@@ -177,6 +177,15 @@ impl ArrayToBytesCodecTraits for BytesCodec {
         Ok(bytes_encoded)
     }
 
+    fn is_no_op(&self) -> bool {
+        if let Some(endian) = &self.endian {
+            if !endian.is_native() {
+                return false;
+            }
+        }
+        true
+    }
+        
     fn decode<'a>(
         &self,
         bytes: RawBytes<'a>,

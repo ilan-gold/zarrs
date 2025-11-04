@@ -222,6 +222,10 @@ impl ArrayToBytesCodecTraits for PcodecCodec {
         }
     }
 
+    fn is_no_op(&self) -> bool {
+        false
+    }
+
     fn decode<'a>(
         &self,
         bytes: RawBytes<'a>,

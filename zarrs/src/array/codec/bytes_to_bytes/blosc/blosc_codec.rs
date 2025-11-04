@@ -18,7 +18,7 @@ use crate::{
 use crate::array::codec::AsyncBytesPartialDecoderTraits;
 
 use super::{
-    blosc_compress_bytes, blosc_decompress_bytes, blosc_partial_decoder, blosc_validate,
+    blosc_compress_bytes, blosc_decompress_bytes_into, blosc_decompress_bytes, blosc_partial_decoder, blosc_validate,
     compressor_as_cstr, BloscCodecConfiguration, BloscCodecConfigurationV1, BloscCompressionLevel,
     BloscCompressor, BloscError, BloscShuffleMode,
 };
@@ -139,8 +139,14 @@ impl BloscCodec {
         )
     }
 
-    fn do_decode_into<'a>(encoded_value: &[u8], n_threads: usize, out: &'a mut [u8]) -> Result<(), CodecError> {
-        todo!("rewrite `blosc_decompress_bytes` to take an output buffer")
+    fn do_decode_into(encoded_value: &[u8], n_threads: usize, out: &mut [u8]) -> Result<(), CodecError> {
+        blosc_validate(encoded_value).map_or_else(
+            || Err(CodecError::from("blosc encoded value is invalid")),
+            |destsize| {
+                blosc_decompress_bytes_into(encoded_value, destsize, n_threads, out)
+                    .map_err(|e| CodecError::from(e.to_string()))
+            },
+        )
     }
 }
 
@@ -222,15 +228,15 @@ impl BytesToBytesCodecTraits for BloscCodec {
         Ok(Cow::Owned(Self::do_decode(&encoded_value, n_threads)?))
     }
 
-    fn decode_into<'a>(
+    fn decode_into(
         &self,
-        bytes: RawBytes<'a>,
+        bytes: &RawBytes<'_>,
         _decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
         let n_threads = 1;
-        Self::do_decode_into(&bytes, n_threads, output_view.get_contiguous_slice()?)
+        Self::do_decode_into(bytes, n_threads, output_view.get_contiguous_slice()?)
     }
 
     fn partial_decoder(

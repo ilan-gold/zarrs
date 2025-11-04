@@ -234,6 +234,11 @@ impl ArrayToBytesCodecTraits for PackBitsCodec {
         Ok(RawBytes::from(bytes_enc))
     }
 
+    fn is_no_op(&self) -> bool {
+        Endianness::Little.is_native()
+    }
+
+
     fn decode<'a>(
         &self,
         bytes: RawBytes<'a>,
