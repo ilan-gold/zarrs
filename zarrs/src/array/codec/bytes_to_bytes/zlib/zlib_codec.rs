@@ -130,7 +130,7 @@ impl BytesToBytesCodecTraits for ZlibCodec {
     ) -> Result<(), CodecError> {
         let mut decoder = flate2::read::ZlibDecoder::new(Cursor::new(bytes));
         let size = decoder.read(output_view.get_contiguous_slice()?)?;
-        if size != usize::try_from(output_view.num_elements()).unwrap() {
+        if size != output_view.contiguous_bytes_len() {
             todo!("err!")
         }
         Ok(())

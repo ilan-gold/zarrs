@@ -221,7 +221,7 @@ impl<'a> ArrayBytesFixedDisjointView<'a> {
     pub fn get_contiguous_slice(&mut self) -> Result<&mut [u8], InvalidBytesLengthError> {
         // FIXME: better error
         if self.is_contiguous() {
-            let mut_slice = unsafe { self.bytes.get_mut(0..self.num_contiguous_elements()) };
+            let mut_slice = unsafe { self.bytes.get_mut(0..self.contiguous_bytes_len()) };
             return mut_slice.ok_or(InvalidBytesLengthError::new(
                 self.num_contiguous_elements(),
                 usize::try_from(self.num_elements()).unwrap(),

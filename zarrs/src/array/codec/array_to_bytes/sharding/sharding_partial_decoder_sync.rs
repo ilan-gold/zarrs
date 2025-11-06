@@ -287,33 +287,6 @@ pub(crate) fn partial_decode_fixed_array_subset(
             .subset(&chunk_indices)
             .expect("matching dimensionality");
         let chunk_subset_overlap = array_subset.overlap(&chunk_subset)?;
-
-        let decoded_bytes = if offset == u64::MAX && size == u64::MAX {
-            let array_size = ArraySize::new(
-                chunk_representation.data_type().size(),
-                chunk_subset_overlap.num_elements(),
-            );
-            ArrayBytes::new_fill_value(array_size, chunk_representation.fill_value())
-        } else {
-            // Partially decode the inner chunk
-            let inner_partial_decoder = get_inner_chunk_partial_decoder(
-                input_handle.clone(),
-                inner_codecs.clone(),
-                chunk_representation,
-                &options,
-                offset,
-                size,
-            )?;
-            inner_partial_decoder
-                .partial_decode(
-                    &chunk_subset_overlap
-                        .relative_to(chunk_subset.start())
-                        .unwrap(),
-                    &options,
-                )?
-                .into_owned()
-        };
-        let decoded_bytes = decoded_bytes.into_fixed()?;
         let mut output_view = unsafe {
             // SAFETY: chunks represent disjoint array subsets
             ArrayBytesFixedDisjointView::new(
@@ -325,9 +298,50 @@ pub(crate) fn partial_decode_fixed_array_subset(
                     .unwrap(),
             )?
         };
-        output_view
-            .copy_from_slice(&decoded_bytes)
-            .map_err(CodecError::from)
+        let decoded_bytes = if offset == u64::MAX && size == u64::MAX {
+            let array_size = ArraySize::new(
+                chunk_representation.data_type().size(),
+                chunk_subset_overlap.num_elements(),
+            );
+            Some(ArrayBytes::new_fill_value(array_size, chunk_representation.fill_value()))
+        } else {
+            if inner_codecs.can_bytes_to_bytes_direct(&output_view) && shard_representation.shape_u64().last() == array_subset.shape().last() && array_subset.shape().last() == chunk_subset.shape().last() { 
+                let byte_fetcher = ByteIntervalPartialDecoder::new(
+                    input_handle.clone(),
+                    offset,
+                    size,
+                );
+                let bytes = byte_fetcher.decode(&options)?.unwrap(); //FIXME: unwrap
+                inner_codecs.decode_into(bytes, chunk_representation, &mut output_view, &options);
+                None
+            } else {
+                // Partially decode the inner chunk
+                let inner_partial_decoder = get_inner_chunk_partial_decoder(
+                    input_handle.clone(),
+                    inner_codecs.clone(),
+                    chunk_representation,
+                    &options,
+                    offset,
+                    size,
+                )?;
+                Some(inner_partial_decoder
+                    .partial_decode(
+                        &chunk_subset_overlap
+                            .relative_to(chunk_subset.start())
+                            .unwrap(),
+                        &options,
+                    )?
+                    .into_owned())
+            }
+        };
+        if let Some(array_bytes) = decoded_bytes {
+            let fixed_array_bytes = array_bytes.into_fixed()?;
+                output_view
+                    .copy_from_slice(&fixed_array_bytes)
+                    .map_err(CodecError::from)
+        } else {
+            Ok(())
+        }
     };
 
     let chunks = shard_chunk_grid.chunks_in_array_subset(array_subset)?;

@@ -132,13 +132,13 @@ impl BytesToBytesCodecTraits for GzipCodec {
     fn decode_into(
         &self,
         bytes: &RawBytes<'_>,
-        _decoded_representation: &BytesRepresentation,
+        decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
         output_view: &mut ArrayBytesFixedDisjointView<'_>,
     ) -> Result<(), CodecError> {
         let mut decoder = GzDecoder::new(Cursor::new(bytes));
         let size = decoder.read(output_view.get_contiguous_slice()?)?;
-        if size != usize::try_from(output_view.num_elements()).unwrap() {
+        if size != output_view.contiguous_bytes_len() {
             todo!("err!")
         }
         Ok(())

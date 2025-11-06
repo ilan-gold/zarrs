@@ -274,6 +274,12 @@ impl CodecChain {
         }
         Ok(bytes_representations)
     }
+
+    pub fn can_bytes_to_bytes_direct(&self, output_view: &ArrayBytesFixedDisjointView<'_> ) -> bool {
+        self.array_to_bytes.is_no_op()
+            && self.array_to_array.is_empty()
+            && output_view.is_contiguous()
+    }
 }
 
 impl CodecTraits for CodecChain {
@@ -454,22 +460,19 @@ impl ArrayToBytesCodecTraits for CodecChain {
             );
         }
 
-        let can_bytes_to_bytes_direct = self.array_to_bytes.is_no_op()
-            && self.array_to_array.is_empty()
-            && output_view.is_contiguous();
         // bytes->bytes
         for (codec, bytes_representation) in std::iter::zip(
             self.bytes_to_bytes.iter().rev(),
             bytes_representations.iter().rev().skip(1),
         ) {
-            if can_bytes_to_bytes_direct {
+            if self.can_bytes_to_bytes_direct(output_view) {
                 codec.decode_into(&bytes, bytes_representation, options, output_view)?;
             } else {
                 bytes = codec.decode(bytes, bytes_representation, options)?;
             }
         }
 
-        if can_bytes_to_bytes_direct {
+        if self.can_bytes_to_bytes_direct(output_view) {
             return Ok(());
         }
 
