@@ -813,7 +813,8 @@ impl<TStorage: ?Sized> Array<TStorage> {
     #[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
     #[must_use]
     pub fn metadata_opt(&self, options: &ArrayMetadataOptions) -> ArrayMetadata {
-        use {ArrayMetadata as AM, MetadataConvertVersion as V};
+        use ArrayMetadata as AM;
+        use MetadataConvertVersion as V;
         let mut metadata = self.metadata.clone();
 
         // Attribute manipulation
@@ -1227,7 +1228,7 @@ mod array_async_writable;
 #[cfg(feature = "async")]
 mod array_async_readable_writable;
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "sharding", feature = "async"))]
 mod array_async_sharded_readable_ext;
 
 /// Transmute from `&[u8]` to `Vec<T>`.
