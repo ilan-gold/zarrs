@@ -144,8 +144,9 @@ impl BytesToBytesCodecTraits for ZstdCodec {
         match output_target {
             ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
                 if output_view.is_contiguous() {
-                    let nbytes = zstd::bulk::decompress_to_buffer(bytes, output_view.get_contiguous_slice()?)?;
-                    if nbytes != bytes.len() {
+                    let out_as_slice = output_view.get_contiguous_slice()?;
+                    let nbytes = zstd::bulk::decompress_to_buffer(bytes, out_as_slice)?;
+                    if nbytes != out_as_slice.len() {
                         return Err(
                             InvalidBytesLengthError::new(nbytes, bytes.len()).into(),
                         );
