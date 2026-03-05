@@ -111,22 +111,41 @@ impl BytesToBytesCodecTraits for Crc32cCodec {
 
     fn decode_into(
         &self,
-        bytes: &ArrayBytesRaw<'_>,
+        encoded_value: &ArrayBytesRaw<'_>,
         _decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
         output_target: ArrayBytesDecodeIntoTarget<'_>,
     ) -> Result<(), CodecError> {
-        if bytes.len() >= CHECKSUM_SIZE {
+        if encoded_value.len() >= CHECKSUM_SIZE {
             match output_target {
                 ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                    if encoded_value.len() >= CHECKSUM_SIZE {
+                    let (data, checksum_stored): (&[u8], [u8; CHECKSUM_SIZE]) = match self.0 {
+                        Crc32cCodecConfigurationLocation::End => (
+                            &encoded_value[..encoded_value.len() - CHECKSUM_SIZE],
+                            encoded_value[encoded_value.len() - CHECKSUM_SIZE..]
+                                .try_into()
+                                .unwrap(),
+                        ),
+                        Crc32cCodecConfigurationLocation::Start => (
+                            &encoded_value[CHECKSUM_SIZE..],
+                            encoded_value[..CHECKSUM_SIZE].try_into().unwrap(),
+                        ),
+                    };
+
                     if options.validate_checksums() {
-                        let decoded_value = &bytes[..bytes.len() - CHECKSUM_SIZE];
-                        let checksum = crc32c::crc32c(decoded_value).to_le_bytes();
-                        if checksum != bytes[bytes.len() - CHECKSUM_SIZE..] {
+                        let checksum = crc32c::crc32c(data).to_le_bytes();
+                        if checksum != checksum_stored {
                             return Err(CodecError::InvalidChecksum);
                         }
                     }
-                    output_view.copy_from_slice(&bytes[..bytes.len() - CHECKSUM_SIZE]).map_err(CodecError::from)
+                    output_view.get_contiguous_slice()?.copy_from_slice(data);
+                    Ok(())
+                } else {
+                    Err(CodecError::Other(
+                        "crc32c decoder expects a 32 bit input".to_string(),
+                    ))
+                }
                 },
                 ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
             }

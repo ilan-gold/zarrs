@@ -1,6 +1,7 @@
 //! An array to bytes codec formed by joining an array to array sequence, array to bytes, and bytes to bytes sequence of codecs.
 
 use std::num::NonZeroU64;
+use std::ops::Index;
 use std::sync::Arc;
 
 use zarrs_plugin::{ExtensionName, ZarrVersion};
@@ -446,15 +447,18 @@ impl ArrayToBytesCodecTraits for CodecChain {
         }
 
         // bytes->bytes
+        // Skip final codecs for special processing as zero-copy.
         let bytes_bytes_iterator = std::iter::zip(
-            self.bytes_to_bytes.iter().rev(),
+            self.bytes_to_bytes.iter().rev().take(self.bytes_to_bytes.len() - 1),
          
-            bytes_representations.iter().rev().skip(1),
+            bytes_representations.iter().rev().take(bytes_representations.len() - 1).skip(1),
         );
-        let (final_codec, final_bytes_representation) = bytes_bytes_iterator.clone().last().unwrap();
         for (codec, bytes_representation) in bytes_bytes_iterator {
             bytes = codec.decode(bytes, bytes_representation, options)?;
         }
+        // Final codec is first in the stored order, hence rev above.
+        let final_codec = self.bytes_to_bytes.index(0);
+        let final_bytes_representation = bytes_representations.index(0);
         if self.can_bytes_to_bytes_direct() {
             final_codec.decode_into(&bytes, final_bytes_representation, options, output_target)?;
             return Ok(());

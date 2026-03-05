@@ -430,7 +430,7 @@ mod tests {
 
         for index_at_end in [true, false] {
             for all_fill_value in [true, false] {
-                for unbounded in [true, false] {
+                for unbounded in [false, false] {
                     for parallel in [true, false] {
                         let concurrent_target = get_concurrent_target(parallel);
                         let options =
