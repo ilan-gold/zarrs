@@ -148,7 +148,7 @@ impl BytesToBytesCodecTraits for ZstdCodec {
                     let nbytes = zstd::bulk::decompress_to_buffer(bytes, out_as_slice)?;
                     if nbytes != out_as_slice.len() {
                         return Err(
-                            InvalidBytesLengthError::new(nbytes, bytes.len()).into(),
+                            InvalidBytesLengthError::new(nbytes, out_as_slice.len()).into(),
                         );
                     }
                     Ok(())
