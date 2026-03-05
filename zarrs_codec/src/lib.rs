@@ -1409,6 +1409,12 @@ pub trait ArrayToBytesCodecTraits: ArrayCodecTraits + core::fmt::Debug {
         options: &CodecOptions,
     ) -> Result<ArrayBytes<'a>, CodecError>;
 
+    /// Decode a chunk.
+    ///
+    /// # Errors
+    /// Returns [`CodecError`] if a codec fails or the decoded output is incompatible with `decoded_representation`.
+    fn is_no_op(&self) -> bool;
+
     /// Compact a chunk.
     ///
     /// Takes an encoded representation and compacts it to remove any extraneous data.
@@ -1606,6 +1612,19 @@ pub trait BytesToBytesCodecTraits: CodecTraits + core::fmt::Debug {
         decoded_representation: &BytesRepresentation,
         options: &CodecOptions,
     ) -> Result<ArrayBytesRaw<'a>, CodecError>;
+
+
+    /// Decode a chunk into a contiguous output.
+    ///
+    /// # Errors
+    /// Returns [`CodecError`] if a codec fails or the decoded output is incompatible with `decoded_representation`.
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError>;
 
     /// Initialises a partial decoder.
     ///

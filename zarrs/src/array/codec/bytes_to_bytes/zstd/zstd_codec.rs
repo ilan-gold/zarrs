@@ -5,10 +5,10 @@ use zarrs_plugin::{PluginCreateError, ZarrVersion};
 use zstd::zstd_safe;
 
 use super::{ZstdCodecConfiguration, ZstdCodecConfigurationV1};
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 use zarrs_codec::{
-    BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
-    PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency,
+    BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits, ArrayBytesDecodeIntoTarget,
+    PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency, InvalidBytesLengthError
 };
 use zarrs_metadata::Configuration;
 
@@ -130,6 +130,32 @@ impl BytesToBytesCodecTraits for ZstdCodec {
             zstd::decode_all(std::io::Cursor::new(&encoded_value))
                 .map_err(CodecError::from)
                 .map(Cow::Owned)
+        }
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                if output_view.is_contiguous() {
+                    let nbytes = zstd::bulk::decompress_to_buffer(bytes, output_view.get_contiguous_slice()?)?;
+                    if nbytes != bytes.len() {
+                        return Err(
+                            InvalidBytesLengthError::new(nbytes, bytes.len()).into(),
+                        );
+                    }
+                    Ok(())
+                } else {
+                    output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?).map_err(CodecError::from)
+                }
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
         }
     }
 

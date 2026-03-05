@@ -8,10 +8,10 @@ use super::{
     GzipCodecConfiguration, GzipCodecConfigurationV1, GzipCompressionLevel,
     GzipCompressionLevelError,
 };
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 use zarrs_codec::{
     BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
-    PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency,
+    PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 use zarrs_plugin::{PluginCreateError, ZarrVersion};
@@ -121,6 +121,30 @@ impl BytesToBytesCodecTraits for GzipCodec {
         let mut out: Vec<u8> = Vec::new();
         decoder.read_to_end(&mut out)?;
         Ok(Cow::Owned(out))
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                let mut decoder = GzDecoder::new(Cursor::new(bytes));
+                if output_view.is_contiguous() {
+                    let size = decoder.read(output_view.get_contiguous_slice()?)?;
+                    if size != output_view.contiguous_bytes_len() {
+                        todo!("err!")
+                    }
+                    Ok(())
+                } else {
+                    output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?).map_err(CodecError::from)
+                }
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }
     }
 
     fn encoded_representation(

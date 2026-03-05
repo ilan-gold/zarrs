@@ -8,16 +8,16 @@ use zarrs_plugin::ZarrVersion;
 use super::{
     BloscCodecConfiguration, BloscCodecConfigurationNumcodecs, BloscCodecConfigurationV1,
     BloscCompressionLevel, BloscCompressor, BloscError, BloscShuffleMode,
-    BloscShuffleModeNumcodecs, blosc_compress_bytes, blosc_decompress_bytes, blosc_partial_decoder,
+    BloscShuffleModeNumcodecs, blosc_compress_bytes, blosc_decompress_bytes, blosc_decompress_bytes_into, blosc_partial_decoder,
     blosc_validate, compressor_as_cstr,
 };
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 #[cfg(feature = "async")]
 use zarrs_codec::AsyncBytesPartialDecoderTraits;
 use zarrs_codec::{
     BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
     CodecOptions, CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
-    RecommendedConcurrency,
+    RecommendedConcurrency, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 use zarrs_plugin::PluginCreateError;
@@ -137,6 +137,20 @@ impl BloscCodec {
             },
         )
     }
+
+    fn do_decode_into(
+        encoded_value: &[u8],
+        n_threads: usize,
+        out: &mut [u8],
+    ) -> Result<(), CodecError> {
+        blosc_validate(encoded_value).map_or_else(
+            || Err(CodecError::from("blosc encoded value is invalid")),
+            |destsize| {
+                blosc_decompress_bytes_into(encoded_value, destsize, n_threads, out)
+                    .map_err(|e| CodecError::from(e.to_string()))
+            },
+        )
+    }
 }
 
 impl CodecTraits for BloscCodec {
@@ -244,6 +258,26 @@ impl BytesToBytesCodecTraits for BloscCodec {
         // .get();
         let n_threads = 1;
         Ok(Cow::Owned(Self::do_decode(&encoded_value, n_threads)?))
+    }
+
+    fn decode_into(
+        &self,
+        encoded_value: &ArrayBytesRaw<'_>,
+        _decoded_representation: &BytesRepresentation,
+        _options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+         match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                let n_threads = 1;
+                if output_view.is_contiguous() {
+                    Self::do_decode_into(encoded_value, n_threads, output_view.get_contiguous_slice()?)
+                } else {
+                    output_view.copy_from_slice(&Self::do_decode(encoded_value, n_threads)?).map_err(CodecError::from)
+                }
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }
     }
 
     fn partial_decoder(

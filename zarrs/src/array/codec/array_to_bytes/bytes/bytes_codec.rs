@@ -138,6 +138,16 @@ impl ArrayToBytesCodecTraits for BytesCodec {
         self as Arc<dyn ArrayToBytesCodecTraits>
     }
 
+    fn is_no_op(&self) -> bool {
+        if let Some(endian) = &self.endian {
+            if !endian.is_native() {
+                return false;
+            }
+        }
+        true
+    }
+
+
     fn encode<'a>(
         &self,
         bytes: ArrayBytes<'a>,

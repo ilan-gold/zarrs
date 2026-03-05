@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use zarrs_plugin::{ExtensionName, ZarrVersion};
 
-use crate::array::codec::{ArrayPartialDecoderCache, BytesPartialDecoderCache};
+use crate::array::codec::{ArrayPartialDecoderCache, BytesPartialDecoderCache, bytes_to_bytes};
 use crate::array::{
-    ArrayBytes, ArrayBytesRaw, BytesRepresentation, ChunkShape, DataType, FillValue,
+    ArrayBytes, ArrayBytesRaw, BytesRepresentation, ChunkShape, DataType, FillValue, ArrayBytesFixedDisjointView
 };
 use zarrs_codec::{
     ArrayBytesDecodeIntoTarget, ArrayCodecTraits, ArrayPartialDecoderTraits,
@@ -337,6 +337,10 @@ impl ArrayToBytesCodecTraits for CodecChain {
         self as Arc<dyn ArrayToBytesCodecTraits>
     }
 
+    fn is_no_op(&self) -> bool {
+        false
+    }
+
     fn encode<'a>(
         &self,
         mut bytes: ArrayBytes<'a>,
@@ -442,11 +446,20 @@ impl ArrayToBytesCodecTraits for CodecChain {
         }
 
         // bytes->bytes
-        for (codec, bytes_representation) in std::iter::zip(
+        let bytes_bytes_iterator = std::iter::zip(
             self.bytes_to_bytes.iter().rev(),
+         
             bytes_representations.iter().rev().skip(1),
-        ) {
+        );
+        let (final_codec, final_bytes_representation) = bytes_bytes_iterator.clone().last().unwrap();
+        for (codec, bytes_representation) in bytes_bytes_iterator {
             bytes = codec.decode(bytes, bytes_representation, options)?;
+        }
+        if self.can_bytes_to_bytes_direct() {
+            final_codec.decode_into(&bytes, final_bytes_representation, options, output_target)?;
+            return Ok(());
+        } else {
+            bytes = final_codec.decode(bytes, final_bytes_representation, options)?;
         }
 
         if self.array_to_array.is_empty() {
@@ -861,6 +874,12 @@ impl ArrayCodecTraits for CodecChain {
         } else {
             self.array_to_bytes.partial_decode_granularity(shape)
         }
+    }
+}
+impl CodecChain {
+    pub fn can_bytes_to_bytes_direct(&self) -> bool {
+        self.array_to_bytes.is_no_op()
+            && self.array_to_array.is_empty()
     }
 }
 

@@ -7,10 +7,10 @@ use super::{
     GDEFLATE_STATIC_HEADER_LENGTH, GDeflateCodecConfiguration, GDeflateCodecConfigurationV0,
     GDeflateCompressionLevel, GDeflateCompressionLevelError, GDeflateCompressor, gdeflate_decode,
 };
-use crate::array::{ArrayBytesRaw, BytesRepresentation, RecommendedConcurrency};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, RecommendedConcurrency, ArrayBytesFixedDisjointView};
 use zarrs_codec::{
     BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
-    PartialDecoderCapability, PartialEncoderCapability,
+    PartialDecoderCapability, PartialEncoderCapability, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 
@@ -136,6 +136,22 @@ impl BytesToBytesCodecTraits for GDeflateCodec {
         _options: &CodecOptions,
     ) -> Result<ArrayBytesRaw<'a>, CodecError> {
         Ok(Cow::Owned(gdeflate_decode(&encoded_value)?))
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?).map_err(CodecError::from)
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }?;
+        Ok(())
     }
 
     fn encoded_representation(

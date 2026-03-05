@@ -3,13 +3,13 @@ use std::sync::Arc;
 use zarrs_plugin::ZarrVersion;
 
 use super::test_unbounded_partial_decoder;
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 #[cfg(feature = "async")]
 use zarrs_codec::AsyncBytesPartialDecoderTraits;
 use zarrs_codec::{
     BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
     CodecOptions, CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
-    RecommendedConcurrency,
+    RecommendedConcurrency, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 
@@ -96,6 +96,21 @@ impl BytesToBytesCodecTraits for TestUnboundedCodec {
         _options: &CodecOptions,
     ) -> Result<ArrayBytesRaw<'a>, CodecError> {
         Ok(encoded_value)
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                output_view.copy_from_slice(bytes).map_err(CodecError::from)
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }
     }
 
     fn partial_decoder(

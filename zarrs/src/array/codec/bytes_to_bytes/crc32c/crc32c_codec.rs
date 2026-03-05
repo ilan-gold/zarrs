@@ -11,13 +11,13 @@ use crate::array::codec::bytes_to_bytes::strip_prefix_partial_decoder::StripPref
 #[cfg(feature = "async")]
 use crate::array::codec::bytes_to_bytes::strip_suffix_partial_decoder::AsyncStripSuffixPartialDecoder;
 use crate::array::codec::bytes_to_bytes::strip_suffix_partial_decoder::StripSuffixPartialDecoder;
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 #[cfg(feature = "async")]
 use zarrs_codec::AsyncBytesPartialDecoderTraits;
 use zarrs_codec::{
     BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
     CodecOptions, CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
-    RecommendedConcurrency,
+    RecommendedConcurrency, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 
@@ -107,6 +107,34 @@ impl BytesToBytesCodecTraits for Crc32cCodec {
             }
         }
         Ok(Cow::Owned(encoded_value))
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        _decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        if bytes.len() >= CHECKSUM_SIZE {
+            match output_target {
+                ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                    if options.validate_checksums() {
+                        let decoded_value = &bytes[..bytes.len() - CHECKSUM_SIZE];
+                        let checksum = crc32c::crc32c(decoded_value).to_le_bytes();
+                        if checksum != bytes[bytes.len() - CHECKSUM_SIZE..] {
+                            return Err(CodecError::InvalidChecksum);
+                        }
+                    }
+                    output_view.copy_from_slice(&bytes[..bytes.len() - CHECKSUM_SIZE]).map_err(CodecError::from)
+                },
+                ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+            }
+        } else {
+            Err(CodecError::Other(
+                "crc32c decoder expects a 32 bit input".to_string(),
+            ))
+        }
     }
 
     fn decode<'a>(

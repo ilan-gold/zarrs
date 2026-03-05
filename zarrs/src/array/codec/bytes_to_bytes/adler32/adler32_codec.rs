@@ -11,14 +11,14 @@ use crate::array::codec::bytes_to_bytes::{
     strip_prefix_partial_decoder::AsyncStripPrefixPartialDecoder,
     strip_suffix_partial_decoder::AsyncStripSuffixPartialDecoder,
 };
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 #[cfg(feature = "async")]
 use zarrs_codec::AsyncBytesPartialDecoderTraits;
 use zarrs_codec::{
     BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
     CodecOptions, CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
-    RecommendedConcurrency,
-};
+    RecommendedConcurrency, ArrayBytesDecodeIntoTarget
+};  
 use zarrs_metadata::Configuration;
 use zarrs_metadata_ext::codec::adler32::Adler32CodecConfigurationChecksumLocation;
 
@@ -121,6 +121,23 @@ impl BytesToBytesCodecTraits for Adler32Codec {
             }
         }
         Ok(Cow::Owned(encoded_value))
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => output_view.copy_from_slice(&self.decode(
+                bytes.clone(),
+                decoded_representation,
+                options,
+            )?).map_err(CodecError::from),
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }
     }
 
     fn decode<'a>(

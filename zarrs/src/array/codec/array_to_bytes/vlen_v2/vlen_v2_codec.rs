@@ -72,6 +72,11 @@ impl ArrayCodecTraits for VlenV2Codec {
 )]
 #[cfg_attr(all(feature = "async", target_arch = "wasm32"), async_trait::async_trait(?Send))]
 impl ArrayToBytesCodecTraits for VlenV2Codec {
+
+    fn is_no_op(&self) -> bool {
+        false
+    }
+
     fn into_dyn(self: Arc<Self>) -> Arc<dyn ArrayToBytesCodecTraits> {
         self as Arc<dyn ArrayToBytesCodecTraits>
     }

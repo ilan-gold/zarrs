@@ -8,13 +8,13 @@ use super::{CHECKSUM_SIZE, Fletcher32CodecConfiguration, Fletcher32CodecConfigur
 #[cfg(feature = "async")]
 use crate::array::codec::bytes_to_bytes::strip_suffix_partial_decoder::AsyncStripSuffixPartialDecoder;
 use crate::array::codec::bytes_to_bytes::strip_suffix_partial_decoder::StripSuffixPartialDecoder;
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 #[cfg(feature = "async")]
 use zarrs_codec::AsyncBytesPartialDecoderTraits;
 use zarrs_codec::{
     BytesPartialDecoderTraits, BytesToBytesCodecTraits, CodecError, CodecMetadataOptions,
     CodecOptions, CodecTraits, PartialDecoderCapability, PartialEncoderCapability,
-    RecommendedConcurrency,
+    RecommendedConcurrency, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 
@@ -155,6 +155,34 @@ impl BytesToBytesCodecTraits for Fletcher32Codec {
         } else {
             Err(CodecError::Other(
                 "fletcher32 decoder expects a 32 bit input".to_string(),
+            ))
+        }
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        _decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        if bytes.len() >= CHECKSUM_SIZE {
+            match output_target {
+                ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                    if options.validate_checksums() {
+                        let decoded_value = &bytes[..bytes.len() - CHECKSUM_SIZE];
+                        let checksum = h5_checksum_fletcher32(decoded_value).to_le_bytes();
+                        if checksum != bytes[bytes.len() - CHECKSUM_SIZE..] {
+                            return Err(CodecError::InvalidChecksum);
+                        }
+                    }
+                    output_view.copy_from_slice(&bytes[..bytes.len() - CHECKSUM_SIZE]).map_err(CodecError::from)
+                },
+                ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+            }
+        } else {
+            Err(CodecError::Other(
+                "crc32c decoder expects a 32 bit input".to_string(),
             ))
         }
     }

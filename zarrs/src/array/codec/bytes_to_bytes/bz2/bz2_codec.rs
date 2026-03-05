@@ -5,10 +5,10 @@ use std::sync::Arc;
 use zarrs_plugin::{PluginCreateError, ZarrVersion};
 
 use super::{Bz2CodecConfiguration, Bz2CodecConfigurationV1, Bz2CompressionLevel};
-use crate::array::{ArrayBytesRaw, BytesRepresentation};
+use crate::array::{ArrayBytesRaw, BytesRepresentation, ArrayBytesFixedDisjointView};
 use zarrs_codec::{
     BytesToBytesCodecTraits, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
-    PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency,
+    PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency, ArrayBytesDecodeIntoTarget
 };
 use zarrs_metadata::Configuration;
 
@@ -112,6 +112,30 @@ impl BytesToBytesCodecTraits for Bz2Codec {
         let mut out: Vec<u8> = Vec::new();
         decoder.read_to_end(&mut out)?;
         Ok(Cow::Owned(out))
+    }
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                let mut decoder = bzip2::read::BzDecoder::new(Cursor::new(bytes));
+                if output_view.is_contiguous() {
+                    let size = decoder.read(output_view.get_contiguous_slice()?)?;
+                    if size != usize::try_from(output_view.num_elements()).unwrap() {
+                        todo!("err!")
+                    }
+                    Ok(())
+                } else {
+                    output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?).map_err(CodecError::from)
+                }
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }
     }
 
     fn encoded_representation(

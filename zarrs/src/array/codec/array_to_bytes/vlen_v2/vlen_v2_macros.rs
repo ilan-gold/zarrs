@@ -129,6 +129,11 @@ macro_rules! vlen_v2_codec {
         )]
         #[cfg_attr(all(feature = "async", target_arch = "wasm32"), async_trait::async_trait(?Send))]
         impl ArrayToBytesCodecTraits for $struct {
+
+            fn is_no_op(&self) -> bool {
+                false
+            }
+
             fn into_dyn(self: Arc<Self>) -> Arc<dyn ArrayToBytesCodecTraits> {
                 self as Arc<dyn ArrayToBytesCodecTraits>
             }

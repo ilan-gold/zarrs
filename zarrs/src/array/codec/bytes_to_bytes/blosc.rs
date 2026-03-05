@@ -205,6 +205,33 @@ fn blosc_nbytes(src: &[u8]) -> Option<usize> {
     (uncompressed_bytes > 0 && cbytes > 0 && blocksize > 0).then_some(uncompressed_bytes)
 }
 
+fn blosc_decompress_bytes_into(
+    src: &[u8],
+    destsize: usize,
+    numinternalthreads: usize,
+    dest: &mut [u8],
+) -> Result<(), BloscError> {
+    let numinternalthreads = if destsize >= MIN_PARALLEL_LENGTH {
+        std::cmp::min(numinternalthreads, BLOSC_MAX_THREADS as usize)
+    } else {
+        1
+    };
+
+    let destsize = unsafe {
+        blosc_decompress_ctx(
+            src.as_ptr().cast::<c_void>(),
+            dest.as_mut_ptr().cast::<c_void>(),
+            destsize,
+            i32::try_from(numinternalthreads).unwrap(),
+        )
+    };
+    if destsize > 0 {
+        Ok(())
+    } else {
+        Err(BloscError::from("blosc_decompress_ctx failed"))
+    }
+}
+
 fn blosc_decompress_bytes(
     src: &[u8],
     destsize: usize,

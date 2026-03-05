@@ -140,6 +140,11 @@ impl ArrayToBytesCodecTraits for ZfpyCodec {
         self as Arc<dyn ArrayToBytesCodecTraits>
     }
 
+    fn is_no_op(&self) -> bool {
+        false
+    }
+
+
     fn encode<'a>(
         &self,
         bytes: ArrayBytes<'a>,

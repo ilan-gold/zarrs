@@ -11,7 +11,7 @@ use zarrs::storage::store::MemoryStore;
 use zarrs_codec::{
     BytesToBytesCodecTraits, Codec, CodecError, CodecMetadataOptions, CodecOptions, CodecTraits,
     PartialDecoderCapability, PartialEncoderCapability, RecommendedConcurrency, register_codec_v3,
-    unregister_codec_v3,
+    unregister_codec_v3, ArrayBytesDecodeIntoTarget
 };
 use zarrs_plugin::{RuntimePlugin, ZarrVersion};
 
@@ -83,6 +83,27 @@ impl BytesToBytesCodecTraits for TestPassthroughCodec {
         _options: &CodecOptions,
     ) -> Result<ArrayBytesRaw<'a>, CodecError> {
         Ok(encoded_value)
+    }
+
+
+    fn decode_into(
+        &self,
+        bytes: &ArrayBytesRaw<'_>,
+        decoded_representation: &BytesRepresentation,
+        options: &CodecOptions,
+        output_target: ArrayBytesDecodeIntoTarget<'_>,
+    ) -> Result<(), CodecError> {
+        match output_target {
+            ArrayBytesDecodeIntoTarget::Fixed(output_view) => {
+                if output_view.is_contiguous() {
+                    output_view.get_contiguous_slice()?.copy_from_slice(&bytes);
+                    Ok(())
+                } else {
+                    output_view.copy_from_slice(&self.decode(bytes.clone(), decoded_representation, options)?).map_err(CodecError::from)
+                }
+            },
+            ArrayBytesDecodeIntoTarget::Optional(_, __) => todo!("variable.")
+        }
     }
 
     fn encoded_representation(

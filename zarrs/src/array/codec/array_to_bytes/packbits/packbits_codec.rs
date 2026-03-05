@@ -152,6 +152,10 @@ impl ArrayToBytesCodecTraits for PackBitsCodec {
         self as Arc<dyn ArrayToBytesCodecTraits>
     }
 
+    fn is_no_op(&self) -> bool {
+        Endianness::Little.is_native()
+    }
+
     fn encode<'a>(
         &self,
         bytes: ArrayBytes<'a>,
