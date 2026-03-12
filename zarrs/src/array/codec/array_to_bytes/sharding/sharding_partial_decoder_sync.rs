@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
@@ -350,6 +351,8 @@ fn partial_decode_fixed_array_subset_into(
     .map_err(Into::<IncompatibleDimensionalityError>::into)?;
 
     let array_subset_start = array_subset.start();
+    let subchunk_shape_u64: &[u64] = bytemuck::must_cast_slice(subchunk_shape);
+    let subchunk_num_elements: u64 = subchunk_shape_u64.iter().product();
     let decode_subchunk_subset_into_slice = |chunk_indices: ArrayIndicesTinyVec| {
         let shard_index_idx =
             ravel_indices(&chunk_indices, &chunks_per_shard).expect("inbounds chunk");
@@ -373,24 +376,49 @@ fn partial_decode_fixed_array_subset_into(
                 .fill(fill_value.as_ne_bytes())
                 .map_err(CodecError::from)
         } else {
-            // Partially decode the subchunk
-            let inner_partial_decoder = get_subchunk_partial_decoder(
-                input_handle,
-                data_type,
-                fill_value,
-                subchunk_shape,
-                inner_codecs,
-                &options,
-                offset,
-                size,
-            )?;
-            inner_partial_decoder.partial_decode_into(
-                &chunk_subset_overlap
-                    .relative_to(chunk_subset.start())
-                    .unwrap(),
-                ArrayBytesDecodeIntoTarget::Fixed(&mut subchunk_view),
-                &options,
-            )
+            let chunk_subset_relative_to_chunk_start = chunk_subset_overlap
+                .relative_to(chunk_subset.start())
+                .unwrap(); 
+            
+            if chunk_subset_relative_to_chunk_start.num_elements() == subchunk_num_elements {
+                let decoded: Arc<Vec<u8>> = Arc::new(
+                input_handle
+                        .partial_decode(
+                            ByteRange::FromStart(offset, Some(size)),
+                            &options,
+                        )?
+                        .ok_or_else(|| {
+                            CodecError::Other("Shard does not exist during partial decode.".to_string())
+                        })?
+                        .into_owned(),
+                );
+                inner_codecs
+                    .decode_into(
+                        Cow::Borrowed(&decoded),
+                        subchunk_shape,
+                        data_type,
+                        fill_value,
+                        ArrayBytesDecodeIntoTarget::Fixed(&mut subchunk_view),
+                        &options,
+                    )
+            } else {
+                // Partially decode the subchunk
+                let inner_partial_decoder = get_subchunk_partial_decoder(
+                    input_handle,
+                    data_type,
+                    fill_value,
+                    subchunk_shape,
+                    inner_codecs,
+                    &options,
+                    offset,
+                    size,
+                )?;
+                inner_partial_decoder.partial_decode_into(
+                    &chunk_subset_relative_to_chunk_start,
+                    ArrayBytesDecodeIntoTarget::Fixed(&mut subchunk_view),
+                    &options,
+                )
+            }
         }
     };
 
