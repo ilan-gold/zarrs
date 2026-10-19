@@ -13,6 +13,9 @@ pub use array_subset_traits::ArraySubsetTraits;
 mod array_subset;
 pub use array_subset::{ArraySubset, ArraySubsetError};
 
+mod prod_subset;
+pub use prod_subset::{AxesSubset, ProdSubset};
+
 mod indexer;
 pub use indexer::{Indexer, IndexerError, IndexerIterator};
 
